@@ -1,84 +1,166 @@
 /* SignatureModal.css */
+
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
-}
-
-.modal-overlay.hidden {
-  display: none;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .modal-content {
-  background-color: white;
-  padding: 20px;
-  border-radius: 8px;
-  width: 90%;
-  max-width: 500px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.modal-header {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px 32px;
+  width: 450px;
+  max-width: 90vw;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  position: relative;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
-  margin-bottom: 20px;
 }
 
 .close-button {
-  background: none;
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: transparent;
   border: none;
-  font-size: 24px;
+  font-size: 28px;
   cursor: pointer;
+  color: #666;
+  transition: color 0.2s ease;
+}
+.close-button:hover {
+  color: #222;
 }
 
-.mode-selector {
+h2 {
+  margin-bottom: 16px;
+  color: #333;
+}
+
+.mode-buttons {
   display: flex;
-  margin-bottom: 20px;
-  gap: 10px;
+  gap: 12px;
+  margin-bottom: 18px;
 }
 
-.mode-button {
-  padding: 8px 16px;
-  border: 1px solid #ddd;
-  background: #f5f5f5;
+.mode-buttons button {
+  flex: 1;
+  padding: 10px 0;
+  border-radius: 6px;
+  border: 1.8px solid #aaa;
+  background-color: #f9f9f9;
+  font-weight: 600;
   cursor: pointer;
-  border-radius: 4px;
+  color: #555;
+  transition: background-color 0.25s ease, border-color 0.25s ease;
 }
 
-.mode-button.active {
-  background: #007bff;
+.mode-buttons button.active,
+.mode-buttons button:hover {
+  background-color: #007bff;
+  border-color: #0056b3;
   color: white;
+}
+
+.sigCanvas {
+  border: 2px solid #007bff;
+  border-radius: 8px;
+  background-color: transparent;
+  cursor: crosshair;
+  box-sizing: border-box;
+  margin-bottom: 12px;
+  touch-action: none; /* better touch support */
+}
+
+.clear-button {
+  background-color: #dc3545;
+  border: none;
+  color: white;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  margin-bottom: 18px;
+  align-self: flex-start;
+}
+
+.clear-button:hover {
+  background-color: #b02a37;
+}
+
+.controls {
+  display: flex;
+  gap: 20px;
+  width: 100%;
+  justify-content: flex-start;
+  margin-bottom: 20px;
+  font-size: 14px;
+  color: #444;
+}
+
+.controls label {
+  display: flex;
+  flex-direction: column;
+  font-weight: 500;
+  user-select: none;
+}
+
+.controls input[type="color"],
+.controls input[type="number"] {
+  margin-top: 6px;
+  width: 70px;
+  padding: 4px 6px;
+  border: 1.5px solid #ccc;
+  border-radius: 5px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.25s ease;
+}
+
+.controls input[type="color"]:hover,
+.controls input[type="number"]:hover {
   border-color: #007bff;
 }
 
-.signature-canvas {
-  border: 1px solid #ddd;
-  margin-bottom: 15px;
+input[type="file"] {
+  margin-top: 12px;
+  width: 100%;
+  cursor: pointer;
 }
 
-.drawing-controls {
-  display: flex;
-  gap: 15px;
-  margin-bottom: 15px;
-  align-items: center;
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.upload-preview {
+img {
+  margin-top: 12px;
   max-width: 100%;
   max-height: 200px;
-  border: 1px solid #ddd;
+  border-radius: 8px;
+  border: 1.5px solid #ddd;
+  object-fit: contain;
+}
+
+.add-button {
+  background-color: #28a745;
+  border: none;
+  color: white;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 16px;
+  width: 100%;
+  transition: background-color 0.3s ease;
+}
+
+.add-button:hover {
+  background-color: #1e7e34;
 }
