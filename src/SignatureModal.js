@@ -54,9 +54,7 @@ const SignatureModal = ({ isOpen, onClose, onAddSignature }) => {
         alert("Please draw your signature first");
         return;
       }
-      const dataUrl = sigCanvas.current
-        .getTrimmedCanvas()
-        .toDataURL("image/png");
+      const dataUrl = sigCanvas.current.getCanvas().toDataURL("image/png"); // Replaced getTrimmedCanvas()
       onAddSignature(dataUrl);
       onClose();
     } else if (mode === "upload") {
