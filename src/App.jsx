@@ -377,7 +377,7 @@ export default function App() {
 
   return (
     <div className="app-container">
-      <h1>Certificate Designer with Fabric.js</h1>
+      <h1>E sign</h1>
 
       <div className="controls-container">
         <input
