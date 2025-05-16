@@ -1,187 +1,11 @@
 import React, { useState, useRef, useEffect } from "react";
 import { fabric } from "fabric";
+import SignatureModal from "./SignatureModal";
 import * as pdfjsLib from "pdfjs-dist/build/pdf";
-import './SignatureModal.css';
 
+import "./app.css";
 // PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-
-const SignatureModal = ({ isOpen, onClose, onAddSignature }) => {
-  const [mode, setMode] = useState("draw");
-  const [signatureData, setSignatureData] = useState(null);
-  const canvasRef = useRef(null);
-  const fabricRef = useRef(null);
-  const [brushColor, setBrushColor] = useState("#000000");
-  const [brushWidth, setBrushWidth] = useState(3);
-
-  // Initialize Fabric only once
-  useEffect(() => {
-    if (!fabricRef.current && canvasRef.current) {
-      const canvas = new fabric.Canvas(canvasRef.current, {
-        width: 400,
-        height: 200,
-        backgroundColor: "#ffffff",
-        isDrawingMode: true,
-      });
-
-      const brush = new fabric.PencilBrush(canvas);
-      brush.color = brushColor;
-      brush.width = brushWidth;
-      canvas.freeDrawingBrush = brush;
-
-      fabricRef.current = canvas;
-    }
-
-    return () => {
-      if (fabricRef.current) {
-        fabricRef.current.dispose();
-        fabricRef.current = null;
-      }
-    };
-  }, []);
-
-  // Update brush when properties change
-  useEffect(() => {
-    if (fabricRef.current) {
-      const brush = new fabric.PencilBrush(fabricRef.current);
-      brush.color = brushColor;
-      brush.width = brushWidth;
-      fabricRef.current.freeDrawingBrush = brush;
-    }
-  }, [brushColor, brushWidth]);
-
-  // Enable/disable drawing when modal is open/closed
-  useEffect(() => {
-    if (fabricRef.current) {
-      fabricRef.current.isDrawingMode = isOpen && mode === "draw";
-    }
-  }, [isOpen, mode]);
-
-  const clearCanvas = () => {
-    if (fabricRef.current) {
-      fabricRef.current.clear();
-      fabricRef.current.backgroundColor = "#ffffff";
-      fabricRef.current.renderAll();
-    }
-  };
-
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setSignatureData(event.target.result);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const saveSignature = () => {
-    if (mode === "draw" && fabricRef.current) {
-      if (fabricRef.current.getObjects().length > 0) {
-        const dataUrl = fabricRef.current.toDataURL({
-          format: "png",
-          quality: 1,
-        });
-        onAddSignature(dataUrl);
-      } else {
-        alert("Please draw your signature first");
-        return;
-      }
-    } else if (mode === "upload" && signatureData) {
-      onAddSignature(signatureData);
-    } else {
-      alert("Please create or upload a signature first");
-      return;
-    }
-    onClose();
-  };
-
-  return (
-    <div className={`modal-overlay ${isOpen ? "visible" : "hidden"}`}>
-      <div className="modal-content">
-        <div className="modal-header">
-          <h2 className="modal-title">Add Signature</h2>
-          <button className="close-button" onClick={onClose}>
-            &times;
-          </button>
-        </div>
-
-        <div className="mode-selector">
-          <button
-            className={`mode-button ${mode === "draw" ? "active" : ""}`}
-            onClick={() => {
-              setMode("draw");
-              setSignatureData(null);
-            }}
-          >
-            Draw Signature
-          </button>
-          <button
-            className={`mode-button ${mode === "upload" ? "active" : ""}`}
-            onClick={() => setMode("upload")}
-          >
-            Upload Signature
-          </button>
-        </div>
-
-        {mode === "draw" ? (
-          <>
-            <canvas
-              ref={canvasRef}
-              width={400}
-              height={200}
-              className="signature-canvas"
-            />
-            <div className="drawing-controls">
-              <label>
-                Color:
-                <input
-                  type="color"
-                  value={brushColor}
-                  onChange={(e) => setBrushColor(e.target.value)}
-                />
-              </label>
-              <label>
-                Width:
-                <input
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={brushWidth}
-                  onChange={(e) => setBrushWidth(parseInt(e.target.value, 10))}
-                />
-              </label>
-              <button onClick={clearCanvas}>Clear</button>
-            </div>
-          </>
-        ) : (
-          <>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileUpload}
-              style={{ display: "block", marginBottom: "1rem" }}
-            />
-            {signatureData && (
-              <img
-                src={signatureData}
-                alt="Signature preview"
-                className="upload-preview"
-              />
-            )}
-          </>
-        )}
-
-        <div className="modal-actions">
-          <button onClick={onClose}>Cancel</button>
-          <button onClick={saveSignature}>Add Signature</button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 
 export default function App() {
   const canvasRef = useRef(null);
@@ -215,9 +39,9 @@ export default function App() {
   const redoStack = useRef([]);
 
   fabric.Object.prototype.set({
-    cornerColor: 'red',
-    cornerStrokeColor: 'black',
-    cornerStyle: 'circle',
+    cornerColor: "red",
+    cornerStrokeColor: "black",
+    cornerStyle: "circle",
     cornerSize: 14,
     transparentCorners: false,
   });
@@ -289,8 +113,6 @@ export default function App() {
     }
   };
 
-
-
   // Update controls for selected object
   const updateControls = () => {
     const activeObject = fabricRef.current.getActiveObject();
@@ -335,7 +157,7 @@ export default function App() {
     const activeObject = fabricRef.current.getActiveObject();
     if (activeObject) {
       activeObject.set(property, value);
-      
+
       if (activeObject.type === "i-text") {
         if (property === "fontSize") setFontSize(value);
         if (property === "fontFamily") setFontFamily(value);
@@ -346,7 +168,7 @@ export default function App() {
         if (property === "stroke") setShapeStroke(value);
         if (property === "strokeWidth") setShapeStrokeWidth(value);
       }
-      
+
       fabricRef.current.renderAll();
       saveState();
     }
@@ -383,7 +205,7 @@ export default function App() {
     if (!fabricRef.current) return;
     setActiveShape(shapeType);
     setIsDrawingMode(false);
-    
+
     let shape;
     const commonProps = {
       left: 100,
@@ -427,7 +249,7 @@ export default function App() {
   // Add signature to canvas
   const addSignatureToCanvas = (signatureData) => {
     if (!fabricRef.current) return;
-    
+
     fabric.Image.fromURL(signatureData, (img) => {
       img.set({
         left: 100,
@@ -457,20 +279,6 @@ export default function App() {
       saveState();
     }
   };
-
-  // Layer operations
-  const bringForward = () => {
-    const canvas = fabricRef.current;
-    const activeObject = canvas.getActiveObject();
-    if (activeObject) {
-      canvas.bringForward(activeObject);
-      canvas.requestRenderAll();
-      saveState();
-    }
-  };
-
-  
- 
 
   // Clear canvas (except background)
   const clearCanvas = () => {
@@ -569,384 +377,6 @@ export default function App() {
 
   return (
     <div className="app-container">
-      <style jsx>{`
-        .app-container {
-          min-height: 100vh;
-          padding: 20px;
-          background-color: #f5f7fa;
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        
-        h1 {
-          font-size: 2rem;
-          color: #2d3748;
-          margin-bottom: 1.5rem;
-          text-align: center;
-        }
-        
-        .controls-container {
-          max-width: 1200px;
-          margin: 0 auto 2rem;
-          background: white;
-          padding: 1.5rem;
-          border-radius: 8px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .file-input {
-          margin-bottom: 1rem;
-          width: 100%;
-          padding: 0.5rem;
-          border: 1px solid #e2e8f0;
-          border-radius: 4px;
-        }
-        
-        .text-input-group {
-          display: flex;
-          gap: 0.5rem;
-          margin-bottom: 1rem;
-          flex-wrap: wrap;
-        }
-        
-        .text-input {
-          flex: 1;
-          min-width: 200px;
-          padding: 0.5rem;
-          border: 1px solid #e2e8f0;
-          border-radius: 4px;
-        }
-        
-        .button {
-          padding: 0.5rem 1rem;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-          font-weight: 500;
-          transition: all 0.2s;
-          display: inline-flex;
-          align-items: center;
-          gap: 0.5rem;
-        }
-        
-        .button:hover {
-          transform: translateY(-1px);
-        }
-        
-        .button:active {
-          transform: translateY(0);
-        }
-        
-        .button-primary {
-          background-color: #4299e1;
-          color: white;
-        }
-        
-        .button-primary:hover {
-          background-color: #3182ce;
-        }
-        
-        .button-success {
-          background-color: #48bb78;
-          color: white;
-        }
-        
-        .button-success:hover {
-          background-color: #38a169;
-        }
-        
-        .button-success.active {
-          background-color: #2f855a;
-          box-shadow: inset 0 0 5px rgba(0,0,0,0.2);
-        }
-        
-        .button-danger {
-          background-color: #f56565;
-          color: white;
-        }
-        
-        .button-danger:hover {
-          background-color: #e53e3e;
-        }
-        
-        .button-danger.active {
-          background-color: #c53030;
-          box-shadow: inset 0 0 5px rgba(0,0,0,0.2);
-        }
-        
-        .button-warning {
-          background-color: #ed8936;
-          color: white;
-        }
-        
-        .button-warning:hover {
-          background-color: #dd6b20;
-        }
-        
-        .button-secondary {
-          background-color: #718096;
-          color: white;
-        }
-        
-        .button-secondary:hover {
-          background-color: #4a5568;
-        }
-        
-        .button-purple {
-          background-color: #9f7aea;
-          color: white;
-        }
-        
-        .button-purple:hover {
-          background-color: #805ad5;
-        }
-        
-        .button-teal {
-          background-color: #38b2ac;
-          color: white;
-        }
-        
-        .button-teal:hover {
-          background-color: #319795;
-        }
-        
-        .button-pink {
-          background-color: #ed64a6;
-          color: white;
-        }
-        
-        .button-pink:hover {
-          background-color: #d53f8c;
-        }
-        
-        .control-group {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 1rem;
-          margin-bottom: 1rem;
-          align-items: center;
-        }
-        
-        .control-label {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          white-space: nowrap;
-        }
-        
-        .control-input {
-          padding: 0.3rem;
-          border: 1px solid #e2e8f0;
-          border-radius: 4px;
-        }
-        
-        .color-input {
-          width: 40px;
-          height: 40px;
-          padding: 0;
-          border: 1px solid #e2e8f0;
-          border-radius: 4px;
-          cursor: pointer;
-        }
-        
-        .number-input {
-          width: 60px;
-          padding: 0.3rem;
-          border: 1px solid #e2e8f0;
-          border-radius: 4px;
-        }
-        
-        .select-input {
-          padding: 0.3rem;
-          border: 1px solid #e2e8f0;
-          border-radius: 4px;
-          min-width: 120px;
-        }
-        
-        .action-buttons {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 0.5rem;
-          margin-bottom: 1.5rem;
-        }
-        
-        .section-title {
-          font-weight: 600;
-          margin: 1rem 0 0.5rem;
-          color: #4a5568;
-        }
-        
-        .canvas-container {
-          max-width: 100%;
-          overflow: auto;
-          margin: 0 auto;
-          background: white;
-          padding: 1rem;
-          border-radius: 8px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        canvas {
-          display: block;
-          margin: 0 auto;
-          border: 1px solid #e2e8f0;
-          max-width: 100%;
-          height: auto;
-        }
-        
-        .shape-buttons {
-          display: flex;
-          gap: 0.5rem;
-          flex-wrap: wrap;
-        }
-        
-        .align-buttons {
-          display: flex;
-          gap: 0.5rem;
-        }
-        
-        .align-button {
-          padding: 0.5rem;
-          border: 1px solid #e2e8f0;
-          background: white;
-          cursor: pointer;
-          border-radius: 4px;
-          display: flex;
-          align-items: center;
-        }
-        
-        .align-button.active {
-          background: #4299e1;
-          color: white;
-          border-color: #4299e1;
-        }
-        
-        /* Signature modal styles */
-        .modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background-color: rgba(0, 0, 0, 0.5);
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          z-index: 1000;
-        }
-        
-        .modal-content {
-          background: white;
-          padding: 2rem;
-          border-radius: 8px;
-          width: 90%;
-          max-width: 500px;
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-        }
-        
-        .modal-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 1.5rem;
-        }
-        
-        .modal-title {
-          font-size: 1.5rem;
-          font-weight: 600;
-          color: #2d3748;
-          margin: 0;
-        }
-        
-        .close-button {
-          background: none;
-          border: none;
-          font-size: 1.5rem;
-          cursor: pointer;
-          color: #718096;
-        }
-        
-        .mode-selector {
-          display: flex;
-          margin-bottom: 1.5rem;
-          border-bottom: 1px solid #e2e8f0;
-        }
-        
-        .mode-button {
-          padding: 0.5rem 1rem;
-          background: none;
-          border: none;
-          cursor: pointer;
-          font-weight: 500;
-          position: relative;
-          color: #718096;
-        }
-        
-        .mode-button.active {
-          color: #4299e1;
-        }
-        
-        .mode-button.active::after {
-          content: '';
-          position: absolute;
-          bottom: -1px;
-          left: 0;
-          right: 0;
-          height: 2px;
-          background-color: #4299e1;
-        }
-        
-        .signature-canvas {
-          border: 1px solid #e2e8f0;
-          margin: 1rem 0;
-          background: white;
-        }
-        
-        .drawing-controls {
-          display: flex;
-          gap: 1rem;
-          margin-bottom: 1rem;
-          align-items: center;
-        }
-        
-        .upload-preview {
-          max-width: 100%;
-          max-height: 200px;
-          margin: 1rem 0;
-          display: block;
-        }
-        
-        .modal-actions {
-          display: flex;
-          justify-content: flex-end;
-          gap: 1rem;
-          margin-top: 1.5rem;
-        }
-        
-        @media (max-width: 768px) {
-          .control-group {
-            flex-direction: column;
-            align-items: flex-start;
-          }
-          
-          .control-label {
-            white-space: normal;
-          }
-          
-          .text-input-group {
-            flex-direction: column;
-          }
-          
-          .text-input {
-            width: 100%;
-          }
-          
-          .action-buttons {
-            flex-direction: column;
-            align-items: flex-start;
-          }
-        }
-      `}</style>
-
       <h1>Certificate Designer with Fabric.js</h1>
 
       <div className="controls-container">
@@ -985,7 +415,10 @@ export default function App() {
               max={100}
               value={fontSize}
               onChange={(e) =>
-                updateActiveObjectStyle("fontSize", parseInt(e.target.value, 10))
+                updateActiveObjectStyle(
+                  "fontSize",
+                  parseInt(e.target.value, 10)
+                )
               }
               className="number-input"
               disabled={isDrawingMode}
@@ -1028,19 +461,31 @@ export default function App() {
           <div className="shape-buttons">
             <button
               onClick={() => addShape("rect")}
-              className={`button ${activeShape === "rect" ? "button-teal active" : "button-secondary"}`}
+              className={`button ${
+                activeShape === "rect"
+                  ? "button-teal active"
+                  : "button-secondary"
+              }`}
             >
               Rectangle
             </button>
             <button
               onClick={() => addShape("circle")}
-              className={`button ${activeShape === "circle" ? "button-teal active" : "button-secondary"}`}
+              className={`button ${
+                activeShape === "circle"
+                  ? "button-teal active"
+                  : "button-secondary"
+              }`}
             >
               Circle
             </button>
             <button
               onClick={() => addShape("triangle")}
-              className={`button ${activeShape === "triangle" ? "button-teal active" : "button-secondary"}`}
+              className={`button ${
+                activeShape === "triangle"
+                  ? "button-teal active"
+                  : "button-secondary"
+              }`}
             >
               Triangle
             </button>
@@ -1062,7 +507,9 @@ export default function App() {
             <input
               type="color"
               value={shapeStroke}
-              onChange={(e) => updateActiveObjectStyle("stroke", e.target.value)}
+              onChange={(e) =>
+                updateActiveObjectStyle("stroke", e.target.value)
+              }
               className="color-input"
               disabled={isDrawingMode}
             />
@@ -1076,7 +523,10 @@ export default function App() {
               max={20}
               value={shapeStrokeWidth}
               onChange={(e) =>
-                updateActiveObjectStyle("strokeWidth", parseInt(e.target.value, 10))
+                updateActiveObjectStyle(
+                  "strokeWidth",
+                  parseInt(e.target.value, 10)
+                )
               }
               className="number-input"
               disabled={isDrawingMode}
@@ -1096,16 +546,6 @@ export default function App() {
             {isDrawingMode && !isEraserMode
               ? "Disable Drawing"
               : "Enable Drawing"}
-          </button>
-
-          <button
-            onClick={() => toggleDrawingMode(!isDrawingMode, true)}
-            className={`button button-danger ${
-              isDrawingMode && isEraserMode ? "active" : ""
-            }`}
-            title="Toggle eraser mode"
-          >
-            {isDrawingMode && isEraserMode ? "Disable Eraser" : "Enable Eraser"}
           </button>
 
           <label className="control-label">
@@ -1131,10 +571,6 @@ export default function App() {
             />
           </label>
         </div>
-
-      
-
-        {/* Action buttons */}
         <div className="action-buttons">
           <button onClick={undo} className="button button-warning">
             Undo
@@ -1143,19 +579,19 @@ export default function App() {
             Delete Selected
           </button>
           <button onClick={clearCanvas} className="button button-secondary">
-            Clear Canvas
+            Clear All
           </button>
           <button onClick={selectAll} className="button button-purple">
             Select All
           </button>
-          {/* <button 
-            onClick={() => setIsSignatureModalOpen(true)} 
+          <button onClick={exportAsImage} className="button button-primary">
+            Export as PNG
+          </button>
+          <button
+            onClick={() => setIsSignatureModalOpen(true)}
             className="button button-teal"
           >
             Add Signature
-          </button> */}
-          <button onClick={exportAsImage} className="button button-primary">
-            Export as PNG
           </button>
         </div>
       </div>
