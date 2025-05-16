@@ -5,6 +5,204 @@ import * as pdfjsLib from "pdfjs-dist/build/pdf";
 // PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
+const SignatureModal = ({ isOpen, onClose, onAddSignature }) => {
+  const [mode, setMode] = useState("draw");
+  const [signatureData, setSignatureData] = useState(null);
+  const canvasRef = useRef(null);
+  const fabricRef = useRef(null);
+  const [brushColor, setBrushColor] = useState("#000000");
+  const [brushWidth, setBrushWidth] = useState(3);
+
+  // Initialize and manage the canvas
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Initialize canvas only once
+    if (!fabricRef.current && canvasRef.current) {
+      const canvas = new fabric.Canvas(canvasRef.current, {
+        width: 400,
+        height: 200,
+        backgroundColor: "#ffffff",
+        isDrawingMode: true,
+      });
+
+      const brush = new fabric.PencilBrush(canvas);
+      brush.color = brushColor;
+      brush.width = brushWidth;
+      canvas.freeDrawingBrush = brush;
+
+      fabricRef.current = canvas;
+    }
+
+    // Update brush when properties change
+    if (fabricRef.current) {
+      const brush = new fabric.PencilBrush(fabricRef.current);
+      brush.color = brushColor;
+      brush.width = brushWidth;
+      fabricRef.current.freeDrawingBrush = brush;
+      fabricRef.current.isDrawingMode = true;
+    }
+
+    return () => {
+      // Don't dispose here - we want to keep the canvas between openings
+      if (fabricRef.current) {
+        fabricRef.current.isDrawingMode = false;
+      }
+    };
+  }, [isOpen, brushColor, brushWidth]);
+
+  // Proper cleanup when component unmounts
+  useEffect(() => {
+    return () => {
+      if (fabricRef.current) {
+        fabricRef.current.dispose();
+        fabricRef.current = null;
+      }
+    };
+  }, []);
+
+  // Handle file upload
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setSignatureData(event.target.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Clear the drawing canvas
+  const clearCanvas = () => {
+    if (fabricRef.current) {
+      fabricRef.current.clear();
+      fabricRef.current.backgroundColor = "#ffffff";
+      fabricRef.current.renderAll();
+    }
+  };
+
+  // Save the signature
+  const saveSignature = () => {
+    if (mode === "draw" && fabricRef.current) {
+      // Check if there's actually something drawn
+      if (fabricRef.current.getObjects().length > 0) {
+        const dataUrl = fabricRef.current.toDataURL({
+          format: "png",
+          quality: 1,
+        });
+        onAddSignature(dataUrl);
+      } else {
+        alert("Please draw your signature first");
+        return;
+      }
+    } else if (mode === "upload" && signatureData) {
+      onAddSignature(signatureData);
+    } else {
+      alert("Please create or upload a signature first");
+      return;
+    }
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-content">
+        <div className="modal-header">
+          <h2 className="modal-title">Add Signature</h2>
+          <button className="close-button" onClick={onClose}>
+            &times;
+          </button>
+        </div>
+
+        <div className="mode-selector">
+          <button
+            className={`mode-button ${mode === "draw" ? "active" : ""}`}
+            onClick={() => {
+              setMode("draw");
+              setSignatureData(null);
+            }}
+          >
+            Draw Signature
+          </button>
+          <button
+            className={`mode-button ${mode === "upload" ? "active" : ""}`}
+            onClick={() => setMode("upload")}
+          >
+            Upload Signature
+          </button>
+        </div>
+
+        {mode === "draw" ? (
+          <>
+            <canvas
+              ref={canvasRef}
+              width={400}
+              height={200}
+              className="signature-canvas"
+            />
+            <div className="drawing-controls">
+              <label className="control-label">
+                Color:
+                <input
+                  type="color"
+                  value={brushColor}
+                  onChange={(e) => setBrushColor(e.target.value)}
+                  className="color-input"
+                />
+              </label>
+              <label className="control-label">
+                Width:
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={brushWidth}
+                  onChange={(e) => setBrushWidth(parseInt(e.target.value, 10))}
+                  className="number-input"
+                />
+              </label>
+              <button
+                onClick={clearCanvas}
+                className="button button-secondary"
+              >
+                Clear
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileUpload}
+              style={{ display: "block", marginBottom: "1rem" }}
+            />
+            {signatureData && (
+              <img
+                src={signatureData}
+                alt="Signature preview"
+                className="upload-preview"
+              />
+            )}
+          </>
+        )}
+
+        <div className="modal-actions">
+          <button onClick={onClose} className="button button-secondary">
+            Cancel
+          </button>
+          <button onClick={saveSignature} className="button button-primary">
+            Add Signature
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
   const canvasRef = useRef(null);
   const fabricRef = useRef(null);
@@ -29,16 +227,19 @@ export default function App() {
   const [shapeStroke, setShapeStroke] = useState("#000000");
   const [shapeStrokeWidth, setShapeStrokeWidth] = useState(1);
 
+  // Signature modal state
+  const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false);
+
   // Undo / redo stack
   const undoStack = useRef([]);
   const redoStack = useRef([]);
 
   fabric.Object.prototype.set({
-    cornerColor: 'red',       // Fill color of the control dot
-    cornerStrokeColor: 'black', // Stroke color for better contrast
-    cornerStyle: 'circle',      // Circle shape is more visible
-    cornerSize: 14,             // Bigger size for better visibility
-    transparentCorners: false,  // Makes corners solid, not faded
+    cornerColor: 'red',
+    cornerStrokeColor: 'black',
+    cornerStyle: 'circle',
+    cornerSize: 14,
+    transparentCorners: false,
   });
 
   // Initialize Fabric canvas with background
@@ -250,6 +451,26 @@ export default function App() {
     fabricRef.current.add(shape).setActiveObject(shape);
     fabricRef.current.renderAll();
     saveState();
+  };
+
+  // Add signature to canvas
+  const addSignatureToCanvas = (signatureData) => {
+    if (!fabricRef.current) return;
+    
+    fabric.Image.fromURL(signatureData, (img) => {
+      img.set({
+        left: 100,
+        top: 100,
+        scaleX: 0.5,
+        scaleY: 0.5,
+        hasControls: true,
+        hasBorders: true,
+        selectable: true,
+      });
+      fabricRef.current.add(img).setActiveObject(img);
+      fabricRef.current.renderAll();
+      saveState();
+    });
   };
 
   // Delete selected object(s)
@@ -654,6 +875,108 @@ export default function App() {
           border-color: #4299e1;
         }
         
+        /* Signature modal styles */
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: rgba(0, 0, 0, 0.5);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 1000;
+        }
+        
+        .modal-content {
+          background: white;
+          padding: 2rem;
+          border-radius: 8px;
+          width: 90%;
+          max-width: 500px;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1.5rem;
+        }
+        
+        .modal-title {
+          font-size: 1.5rem;
+          font-weight: 600;
+          color: #2d3748;
+          margin: 0;
+        }
+        
+        .close-button {
+          background: none;
+          border: none;
+          font-size: 1.5rem;
+          cursor: pointer;
+          color: #718096;
+        }
+        
+        .mode-selector {
+          display: flex;
+          margin-bottom: 1.5rem;
+          border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .mode-button {
+          padding: 0.5rem 1rem;
+          background: none;
+          border: none;
+          cursor: pointer;
+          font-weight: 500;
+          position: relative;
+          color: #718096;
+        }
+        
+        .mode-button.active {
+          color: #4299e1;
+        }
+        
+        .mode-button.active::after {
+          content: '';
+          position: absolute;
+          bottom: -1px;
+          left: 0;
+          right: 0;
+          height: 2px;
+          background-color: #4299e1;
+        }
+        
+        .signature-canvas {
+          border: 1px solid #e2e8f0;
+          margin: 1rem 0;
+          background: white;
+        }
+        
+        .drawing-controls {
+          display: flex;
+          gap: 1rem;
+          margin-bottom: 1rem;
+          align-items: center;
+        }
+        
+        .upload-preview {
+          max-width: 100%;
+          max-height: 200px;
+          margin: 1rem 0;
+          display: block;
+        }
+        
+        .modal-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 1rem;
+          margin-top: 1.5rem;
+        }
+        
         @media (max-width: 768px) {
           .control-group {
             flex-direction: column;
@@ -897,6 +1220,12 @@ export default function App() {
           <button onClick={selectAll} className="button button-purple">
             Select All
           </button>
+          <button 
+            onClick={() => setIsSignatureModalOpen(true)} 
+            className="button button-teal"
+          >
+            Add Signature
+          </button>
           <button onClick={exportAsImage} className="button button-primary">
             Export as PNG
           </button>
@@ -907,6 +1236,13 @@ export default function App() {
       <div className="canvas-container">
         <canvas ref={canvasRef}></canvas>
       </div>
+
+      {/* Signature Modal */}
+      <SignatureModal
+        isOpen={isSignatureModalOpen}
+        onClose={() => setIsSignatureModalOpen(false)}
+        onAddSignature={addSignatureToCanvas}
+      />
     </div>
   );
 }
