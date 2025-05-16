@@ -15,6 +15,7 @@ export default function App() {
   const [fontSize, setFontSize] = useState(24);
   const [fontFamily, setFontFamily] = useState("Arial");
   const [fontColor, setFontColor] = useState("#000000");
+  const [textAlign, setTextAlign] = useState("left");
 
   // Drawing tool states
   const [isDrawingMode, setIsDrawingMode] = useState(false);
@@ -22,9 +23,23 @@ export default function App() {
   const [brushWidth, setBrushWidth] = useState(5);
   const [isEraserMode, setIsEraserMode] = useState(false);
 
+  // Shape tool states
+  const [activeShape, setActiveShape] = useState(null);
+  const [shapeFill, setShapeFill] = useState("#ffffff");
+  const [shapeStroke, setShapeStroke] = useState("#000000");
+  const [shapeStrokeWidth, setShapeStrokeWidth] = useState(1);
+
   // Undo / redo stack
   const undoStack = useRef([]);
   const redoStack = useRef([]);
+
+  fabric.Object.prototype.set({
+    cornerColor: 'red',       // Fill color of the control dot
+    cornerStrokeColor: 'black', // Stroke color for better contrast
+    cornerStyle: 'circle',      // Circle shape is more visible
+    cornerSize: 14,             // Bigger size for better visibility
+    transparentCorners: false,  // Makes corners solid, not faded
+  });
 
   // Initialize Fabric canvas with background
   const initFabric = (bgUrl, width, height) => {
@@ -58,6 +73,8 @@ export default function App() {
       setFontSize(24);
       setFontFamily("Arial");
       setFontColor("#000000");
+      setTextAlign("left");
+      setActiveShape(null);
     });
 
     // Record initial state for undo stack
@@ -102,13 +119,22 @@ export default function App() {
     }
   };
 
-  // Update controls for selected text object
+  // Update controls for selected object
   const updateControls = () => {
     const activeObject = fabricRef.current.getActiveObject();
-    if (activeObject && activeObject.type === "i-text") {
+    if (!activeObject) return;
+
+    if (activeObject.type === "i-text") {
       setFontSize(activeObject.fontSize || 24);
       setFontFamily(activeObject.fontFamily || "Arial");
       setFontColor(activeObject.fill || "#000000");
+      setTextAlign(activeObject.textAlign || "left");
+      setActiveShape(null);
+    } else if (["rect", "circle", "triangle"].includes(activeObject.type)) {
+      setActiveShape(activeObject.type);
+      setShapeFill(activeObject.fill || "#ffffff");
+      setShapeStroke(activeObject.stroke || "#000000");
+      setShapeStrokeWidth(activeObject.strokeWidth || 1);
     }
   };
 
@@ -122,6 +148,7 @@ export default function App() {
       fontSize,
       fill: fontColor,
       fontFamily,
+      textAlign,
       editable: true,
     });
 
@@ -131,17 +158,24 @@ export default function App() {
     saveState();
   };
 
-  // Update active text object's style
-  const updateActiveTextStyle = (property, value) => {
+  // Update active object's style
+  const updateActiveObjectStyle = (property, value) => {
     const activeObject = fabricRef.current.getActiveObject();
-    if (activeObject && activeObject.type === "i-text") {
+    if (activeObject) {
       activeObject.set(property, value);
+      
+      if (activeObject.type === "i-text") {
+        if (property === "fontSize") setFontSize(value);
+        if (property === "fontFamily") setFontFamily(value);
+        if (property === "fill") setFontColor(value);
+        if (property === "textAlign") setTextAlign(value);
+      } else if (["rect", "circle", "triangle"].includes(activeObject.type)) {
+        if (property === "fill") setShapeFill(value);
+        if (property === "stroke") setShapeStroke(value);
+        if (property === "strokeWidth") setShapeStrokeWidth(value);
+      }
+      
       fabricRef.current.renderAll();
-
-      if (property === "fontSize") setFontSize(value);
-      if (property === "fontFamily") setFontFamily(value);
-      if (property === "fill") setFontColor(value);
-
       saveState();
     }
   };
@@ -151,16 +185,16 @@ export default function App() {
     if (!fabricRef.current) return;
     setIsDrawingMode(enable);
     setIsEraserMode(eraser);
+    setActiveShape(null);
 
     fabricRef.current.isDrawingMode = enable;
 
     if (enable) {
       if (eraser) {
-        // Eraser brush: draw with white color, composite operation = 'destination-out'
         const eraserBrush = new fabric.PencilBrush(fabricRef.current);
         eraserBrush.color = "rgba(0,0,0,1)";
         eraserBrush.width = brushWidth;
-        eraserBrush.globalCompositeOperation = "destination-out"; // eraser effect
+        eraserBrush.globalCompositeOperation = "destination-out";
         fabricRef.current.freeDrawingBrush = eraserBrush;
       } else {
         const brush = new fabric.PencilBrush(fabricRef.current);
@@ -170,6 +204,52 @@ export default function App() {
         fabricRef.current.freeDrawingBrush = brush;
       }
     }
+  };
+
+  // Add shape to canvas
+  const addShape = (shapeType) => {
+    if (!fabricRef.current) return;
+    setActiveShape(shapeType);
+    setIsDrawingMode(false);
+    
+    let shape;
+    const commonProps = {
+      left: 100,
+      top: 100,
+      fill: shapeFill,
+      stroke: shapeStroke,
+      strokeWidth: shapeStrokeWidth,
+      selectable: true,
+    };
+
+    switch (shapeType) {
+      case "rect":
+        shape = new fabric.Rect({
+          ...commonProps,
+          width: 100,
+          height: 100,
+        });
+        break;
+      case "circle":
+        shape = new fabric.Circle({
+          ...commonProps,
+          radius: 50,
+        });
+        break;
+      case "triangle":
+        shape = new fabric.Triangle({
+          ...commonProps,
+          width: 100,
+          height: 100,
+        });
+        break;
+      default:
+        return;
+    }
+
+    fabricRef.current.add(shape).setActiveObject(shape);
+    fabricRef.current.renderAll();
+    saveState();
   };
 
   // Delete selected object(s)
@@ -186,7 +266,7 @@ export default function App() {
     }
   };
 
-  // Bring forward / send backward
+  // Layer operations
   const bringForward = () => {
     const canvas = fabricRef.current;
     const activeObject = canvas.getActiveObject();
@@ -196,11 +276,32 @@ export default function App() {
       saveState();
     }
   };
+
   const sendBackward = () => {
     const canvas = fabricRef.current;
     const activeObject = canvas.getActiveObject();
     if (activeObject) {
       canvas.sendBackwards(activeObject);
+      canvas.requestRenderAll();
+      saveState();
+    }
+  };
+
+  const bringToFront = () => {
+    const canvas = fabricRef.current;
+    const activeObject = canvas.getActiveObject();
+    if (activeObject) {
+      canvas.bringToFront(activeObject);
+      canvas.requestRenderAll();
+      saveState();
+    }
+  };
+
+  const sendToBack = () => {
+    const canvas = fabricRef.current;
+    const activeObject = canvas.getActiveObject();
+    if (activeObject) {
+      canvas.sendToBack(activeObject);
       canvas.requestRenderAll();
       saveState();
     }
@@ -301,31 +402,305 @@ export default function App() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <h1 className="text-3xl font-bold mb-6">
-        Certificate Designer with Fabric.js
-      </h1>
+    <div className="app-container">
+      <style jsx>{`
+        .app-container {
+          min-height: 100vh;
+          padding: 20px;
+          background-color: #f5f7fa;
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        h1 {
+          font-size: 2rem;
+          color: #2d3748;
+          margin-bottom: 1.5rem;
+          text-align: center;
+        }
+        
+        .controls-container {
+          max-width: 1200px;
+          margin: 0 auto 2rem;
+          background: white;
+          padding: 1.5rem;
+          border-radius: 8px;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .file-input {
+          margin-bottom: 1rem;
+          width: 100%;
+          padding: 0.5rem;
+          border: 1px solid #e2e8f0;
+          border-radius: 4px;
+        }
+        
+        .text-input-group {
+          display: flex;
+          gap: 0.5rem;
+          margin-bottom: 1rem;
+          flex-wrap: wrap;
+        }
+        
+        .text-input {
+          flex: 1;
+          min-width: 200px;
+          padding: 0.5rem;
+          border: 1px solid #e2e8f0;
+          border-radius: 4px;
+        }
+        
+        .button {
+          padding: 0.5rem 1rem;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-weight: 500;
+          transition: all 0.2s;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+        
+        .button:hover {
+          transform: translateY(-1px);
+        }
+        
+        .button:active {
+          transform: translateY(0);
+        }
+        
+        .button-primary {
+          background-color: #4299e1;
+          color: white;
+        }
+        
+        .button-primary:hover {
+          background-color: #3182ce;
+        }
+        
+        .button-success {
+          background-color: #48bb78;
+          color: white;
+        }
+        
+        .button-success:hover {
+          background-color: #38a169;
+        }
+        
+        .button-success.active {
+          background-color: #2f855a;
+          box-shadow: inset 0 0 5px rgba(0,0,0,0.2);
+        }
+        
+        .button-danger {
+          background-color: #f56565;
+          color: white;
+        }
+        
+        .button-danger:hover {
+          background-color: #e53e3e;
+        }
+        
+        .button-danger.active {
+          background-color: #c53030;
+          box-shadow: inset 0 0 5px rgba(0,0,0,0.2);
+        }
+        
+        .button-warning {
+          background-color: #ed8936;
+          color: white;
+        }
+        
+        .button-warning:hover {
+          background-color: #dd6b20;
+        }
+        
+        .button-secondary {
+          background-color: #718096;
+          color: white;
+        }
+        
+        .button-secondary:hover {
+          background-color: #4a5568;
+        }
+        
+        .button-purple {
+          background-color: #9f7aea;
+          color: white;
+        }
+        
+        .button-purple:hover {
+          background-color: #805ad5;
+        }
+        
+        .button-teal {
+          background-color: #38b2ac;
+          color: white;
+        }
+        
+        .button-teal:hover {
+          background-color: #319795;
+        }
+        
+        .button-pink {
+          background-color: #ed64a6;
+          color: white;
+        }
+        
+        .button-pink:hover {
+          background-color: #d53f8c;
+        }
+        
+        .control-group {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 1rem;
+          margin-bottom: 1rem;
+          align-items: center;
+        }
+        
+        .control-label {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          white-space: nowrap;
+        }
+        
+        .control-input {
+          padding: 0.3rem;
+          border: 1px solid #e2e8f0;
+          border-radius: 4px;
+        }
+        
+        .color-input {
+          width: 40px;
+          height: 40px;
+          padding: 0;
+          border: 1px solid #e2e8f0;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+        
+        .number-input {
+          width: 60px;
+          padding: 0.3rem;
+          border: 1px solid #e2e8f0;
+          border-radius: 4px;
+        }
+        
+        .select-input {
+          padding: 0.3rem;
+          border: 1px solid #e2e8f0;
+          border-radius: 4px;
+          min-width: 120px;
+        }
+        
+        .action-buttons {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+          margin-bottom: 1.5rem;
+        }
+        
+        .section-title {
+          font-weight: 600;
+          margin: 1rem 0 0.5rem;
+          color: #4a5568;
+        }
+        
+        .canvas-container {
+          max-width: 100%;
+          overflow: auto;
+          margin: 0 auto;
+          background: white;
+          padding: 1rem;
+          border-radius: 8px;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        canvas {
+          display: block;
+          margin: 0 auto;
+          border: 1px solid #e2e8f0;
+          max-width: 100%;
+          height: auto;
+        }
+        
+        .shape-buttons {
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+        
+        .align-buttons {
+          display: flex;
+          gap: 0.5rem;
+        }
+        
+        .align-button {
+          padding: 0.5rem;
+          border: 1px solid #e2e8f0;
+          background: white;
+          cursor: pointer;
+          border-radius: 4px;
+          display: flex;
+          align-items: center;
+        }
+        
+        .align-button.active {
+          background: #4299e1;
+          color: white;
+          border-color: #4299e1;
+        }
+        
+        @media (max-width: 768px) {
+          .control-group {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+          
+          .control-label {
+            white-space: normal;
+          }
+          
+          .text-input-group {
+            flex-direction: column;
+          }
+          
+          .text-input {
+            width: 100%;
+          }
+          
+          .action-buttons {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+        }
+      `}</style>
 
-      <div className="mb-4">
+      <h1>Certificate Designer with Fabric.js</h1>
+
+      <div className="controls-container">
         <input
           type="file"
           accept="application/pdf,image/*"
           onChange={handleFileChange}
-          className="mb-2"
+          className="file-input"
         />
 
-        <div className="flex gap-2 mb-4 flex-wrap">
+        <div className="text-input-group">
           <input
             type="text"
             placeholder="Enter text"
             value={newText}
             onChange={(e) => setNewText(e.target.value)}
-            className="border px-2 py-1 rounded flex-grow"
+            className="text-input"
             disabled={isDrawingMode}
           />
           <button
             onClick={addText}
-            className="bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-700"
+            className="button button-primary"
             disabled={isDrawingMode}
           >
             Add Text
@@ -333,30 +708,30 @@ export default function App() {
         </div>
 
         {/* Text styling controls */}
-        <div className="flex items-center gap-4 mb-4 flex-wrap">
-          <label>
-            Font Size:{" "}
+        <div className="control-group">
+          <label className="control-label">
+            Font Size:
             <input
               type="number"
               min={8}
               max={100}
               value={fontSize}
               onChange={(e) =>
-                updateActiveTextStyle("fontSize", parseInt(e.target.value, 10))
+                updateActiveObjectStyle("fontSize", parseInt(e.target.value, 10))
               }
-              className="border px-2 py-1 rounded w-20"
+              className="number-input"
               disabled={isDrawingMode}
             />
           </label>
 
-          <label>
-            Font Family:{" "}
+          <label className="control-label">
+            Font Family:
             <select
               value={fontFamily}
               onChange={(e) =>
-                updateActiveTextStyle("fontFamily", e.target.value)
+                updateActiveObjectStyle("fontFamily", e.target.value)
               }
-              className="border px-2 py-1 rounded"
+              className="select-input"
               disabled={isDrawingMode}
             >
               <option value="Arial">Arial</option>
@@ -367,27 +742,86 @@ export default function App() {
             </select>
           </label>
 
-          <label>
-            Font Color:{" "}
+          <label className="control-label">
+            Font Color:
             <input
               type="color"
               value={fontColor}
-              onChange={(e) => updateActiveTextStyle("fill", e.target.value)}
-              className="w-10 h-10 p-0 border rounded"
+              onChange={(e) => updateActiveObjectStyle("fill", e.target.value)}
+              className="color-input"
               title="Select font color"
               disabled={isDrawingMode}
             />
           </label>
         </div>
 
+        {/* Shape controls */}
+        <div className="control-group">
+          <div className="shape-buttons">
+            <button
+              onClick={() => addShape("rect")}
+              className={`button ${activeShape === "rect" ? "button-teal active" : "button-secondary"}`}
+            >
+              Rectangle
+            </button>
+            <button
+              onClick={() => addShape("circle")}
+              className={`button ${activeShape === "circle" ? "button-teal active" : "button-secondary"}`}
+            >
+              Circle
+            </button>
+            <button
+              onClick={() => addShape("triangle")}
+              className={`button ${activeShape === "triangle" ? "button-teal active" : "button-secondary"}`}
+            >
+              Triangle
+            </button>
+          </div>
+
+          <label className="control-label">
+            Fill:
+            <input
+              type="color"
+              value={shapeFill}
+              onChange={(e) => updateActiveObjectStyle("fill", e.target.value)}
+              className="color-input"
+              disabled={isDrawingMode}
+            />
+          </label>
+
+          <label className="control-label">
+            Stroke:
+            <input
+              type="color"
+              value={shapeStroke}
+              onChange={(e) => updateActiveObjectStyle("stroke", e.target.value)}
+              className="color-input"
+              disabled={isDrawingMode}
+            />
+          </label>
+
+          <label className="control-label">
+            Stroke Width:
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={shapeStrokeWidth}
+              onChange={(e) =>
+                updateActiveObjectStyle("strokeWidth", parseInt(e.target.value, 10))
+              }
+              className="number-input"
+              disabled={isDrawingMode}
+            />
+          </label>
+        </div>
+
         {/* Drawing controls */}
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <div className="control-group">
           <button
             onClick={() => toggleDrawingMode(!isDrawingMode, false)}
-            className={`px-4 py-1 rounded ${
-              isDrawingMode && !isEraserMode
-                ? "bg-green-700 text-white"
-                : "bg-green-600 text-white hover:bg-green-700"
+            className={`button button-success ${
+              isDrawingMode && !isEraserMode ? "active" : ""
             }`}
             title="Toggle drawing mode"
           >
@@ -398,89 +832,81 @@ export default function App() {
 
           <button
             onClick={() => toggleDrawingMode(!isDrawingMode, true)}
-            className={`px-4 py-1 rounded ${
-              isDrawingMode && isEraserMode
-                ? "bg-red-700 text-white"
-                : "bg-red-600 text-white hover:bg-red-700"
+            className={`button button-danger ${
+              isDrawingMode && isEraserMode ? "active" : ""
             }`}
             title="Toggle eraser mode"
           >
             {isDrawingMode && isEraserMode ? "Disable Eraser" : "Enable Eraser"}
           </button>
 
-          <label>
-            Brush Color:{" "}
+          <label className="control-label">
+            Brush Color:
             <input
               type="color"
               value={brushColor}
               onChange={(e) => setBrushColor(e.target.value)}
               disabled={isDrawingMode && isEraserMode}
-              className="w-10 h-10 p-0 border rounded"
+              className="color-input"
             />
           </label>
 
-          <label>
-            Brush Width:{" "}
+          <label className="control-label">
+            Brush Width:
             <input
               type="number"
               min={1}
               max={50}
               value={brushWidth}
               onChange={(e) => setBrushWidth(parseInt(e.target.value, 10))}
-              className="border px-2 py-1 rounded w-20"
+              className="number-input"
             />
           </label>
         </div>
 
-        {/* Undo / redo / clear / delete */}
-        <div className="flex gap-2 mb-6 flex-wrap">
-          <button
-            onClick={undo}
-            className="bg-yellow-500 text-black px-4 py-1 rounded hover:bg-yellow-600"
-          >
-            Undo
+        {/* Layer controls */}
+        <div className="control-group">
+          <button onClick={bringToFront} className="button button-pink">
+            Bring to Front
           </button>
-          <button
-            onClick={redo}
-            className="bg-yellow-400 text-black px-4 py-1 rounded hover:bg-yellow-500"
-          >
-            Redo
+          <button onClick={sendToBack} className="button button-pink">
+            Send to Back
           </button>
-          <button
-            onClick={deleteSelected}
-            className="bg-red-600 text-white px-4 py-1 rounded hover:bg-red-700"
-          >
-            Delete Selected
+          <button onClick={bringForward} className="button button-pink">
+            Bring Forward
           </button>
-          <button
-            onClick={clearCanvas}
-            className="bg-gray-600 text-white px-4 py-1 rounded hover:bg-gray-700"
-          >
-            Clear Canvas
-          </button>
-          <button
-            onClick={selectAll}
-            className="bg-purple-600 text-white px-4 py-1 rounded hover:bg-purple-700"
-          >
-            Select All
+          <button onClick={sendBackward} className="button button-pink">
+            Send Backward
           </button>
         </div>
 
-        {/* Export */}
-        <button
-          onClick={exportAsImage}
-          className="bg-blue-700 text-white px-6 py-2 rounded hover:bg-blue-800"
-        >
-          Export as PNG
-        </button>
+        {/* Action buttons */}
+        <div className="action-buttons">
+          <button onClick={undo} className="button button-warning">
+            Undo
+          </button>
+          <button onClick={redo} className="button button-warning">
+            Redo
+          </button>
+          <button onClick={deleteSelected} className="button button-danger">
+            Delete Selected
+          </button>
+          <button onClick={clearCanvas} className="button button-secondary">
+            Clear Canvas
+          </button>
+          <button onClick={selectAll} className="button button-purple">
+            Select All
+          </button>
+          <button onClick={exportAsImage} className="button button-primary">
+            Export as PNG
+          </button>
+        </div>
       </div>
 
       {/* Canvas */}
-      <canvas
-        ref={canvasRef}
-        className="border border-gray-400 mx-auto"
-        style={{ maxWidth: "100%", height: "auto" }}
-      ></canvas>
+      <div className="canvas-container">
+        <canvas ref={canvasRef}></canvas>
+      </div>
     </div>
   );
 }
