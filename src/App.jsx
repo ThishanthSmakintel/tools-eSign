@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { fabric } from "fabric";
 import * as pdfjsLib from "pdfjs-dist/build/pdf";
+import './SignatureModal.css';
 
 // PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -13,11 +14,8 @@ const SignatureModal = ({ isOpen, onClose, onAddSignature }) => {
   const [brushColor, setBrushColor] = useState("#000000");
   const [brushWidth, setBrushWidth] = useState(3);
 
-  // Initialize and manage the canvas
+  // Initialize Fabric only once
   useEffect(() => {
-    if (!isOpen) return;
-
-    // Initialize canvas only once
     if (!fabricRef.current && canvasRef.current) {
       const canvas = new fabric.Canvas(canvasRef.current, {
         width: 400,
@@ -34,25 +32,6 @@ const SignatureModal = ({ isOpen, onClose, onAddSignature }) => {
       fabricRef.current = canvas;
     }
 
-    // Update brush when properties change
-    if (fabricRef.current) {
-      const brush = new fabric.PencilBrush(fabricRef.current);
-      brush.color = brushColor;
-      brush.width = brushWidth;
-      fabricRef.current.freeDrawingBrush = brush;
-      fabricRef.current.isDrawingMode = true;
-    }
-
-    return () => {
-      // Don't dispose here - we want to keep the canvas between openings
-      if (fabricRef.current) {
-        fabricRef.current.isDrawingMode = false;
-      }
-    };
-  }, [isOpen, brushColor, brushWidth]);
-
-  // Proper cleanup when component unmounts
-  useEffect(() => {
     return () => {
       if (fabricRef.current) {
         fabricRef.current.dispose();
@@ -61,7 +40,31 @@ const SignatureModal = ({ isOpen, onClose, onAddSignature }) => {
     };
   }, []);
 
-  // Handle file upload
+  // Update brush when properties change
+  useEffect(() => {
+    if (fabricRef.current) {
+      const brush = new fabric.PencilBrush(fabricRef.current);
+      brush.color = brushColor;
+      brush.width = brushWidth;
+      fabricRef.current.freeDrawingBrush = brush;
+    }
+  }, [brushColor, brushWidth]);
+
+  // Enable/disable drawing when modal is open/closed
+  useEffect(() => {
+    if (fabricRef.current) {
+      fabricRef.current.isDrawingMode = isOpen && mode === "draw";
+    }
+  }, [isOpen, mode]);
+
+  const clearCanvas = () => {
+    if (fabricRef.current) {
+      fabricRef.current.clear();
+      fabricRef.current.backgroundColor = "#ffffff";
+      fabricRef.current.renderAll();
+    }
+  };
+
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -73,19 +76,8 @@ const SignatureModal = ({ isOpen, onClose, onAddSignature }) => {
     reader.readAsDataURL(file);
   };
 
-  // Clear the drawing canvas
-  const clearCanvas = () => {
-    if (fabricRef.current) {
-      fabricRef.current.clear();
-      fabricRef.current.backgroundColor = "#ffffff";
-      fabricRef.current.renderAll();
-    }
-  };
-
-  // Save the signature
   const saveSignature = () => {
     if (mode === "draw" && fabricRef.current) {
-      // Check if there's actually something drawn
       if (fabricRef.current.getObjects().length > 0) {
         const dataUrl = fabricRef.current.toDataURL({
           format: "png",
@@ -105,10 +97,8 @@ const SignatureModal = ({ isOpen, onClose, onAddSignature }) => {
     onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="modal-overlay">
+    <div className={`modal-overlay ${isOpen ? "visible" : "hidden"}`}>
       <div className="modal-content">
         <div className="modal-header">
           <h2 className="modal-title">Add Signature</h2>
@@ -144,16 +134,15 @@ const SignatureModal = ({ isOpen, onClose, onAddSignature }) => {
               className="signature-canvas"
             />
             <div className="drawing-controls">
-              <label className="control-label">
+              <label>
                 Color:
                 <input
                   type="color"
                   value={brushColor}
                   onChange={(e) => setBrushColor(e.target.value)}
-                  className="color-input"
                 />
               </label>
-              <label className="control-label">
+              <label>
                 Width:
                 <input
                   type="number"
@@ -161,15 +150,9 @@ const SignatureModal = ({ isOpen, onClose, onAddSignature }) => {
                   max={20}
                   value={brushWidth}
                   onChange={(e) => setBrushWidth(parseInt(e.target.value, 10))}
-                  className="number-input"
                 />
               </label>
-              <button
-                onClick={clearCanvas}
-                className="button button-secondary"
-              >
-                Clear
-              </button>
+              <button onClick={clearCanvas}>Clear</button>
             </div>
           </>
         ) : (
@@ -191,17 +174,14 @@ const SignatureModal = ({ isOpen, onClose, onAddSignature }) => {
         )}
 
         <div className="modal-actions">
-          <button onClick={onClose} className="button button-secondary">
-            Cancel
-          </button>
-          <button onClick={saveSignature} className="button button-primary">
-            Add Signature
-          </button>
+          <button onClick={onClose}>Cancel</button>
+          <button onClick={saveSignature}>Add Signature</button>
         </div>
       </div>
     </div>
   );
 };
+
 
 export default function App() {
   const canvasRef = useRef(null);
@@ -309,16 +289,7 @@ export default function App() {
     }
   };
 
-  // Redo action
-  const redo = () => {
-    if (redoStack.current.length > 0 && fabricRef.current) {
-      const redoState = redoStack.current.pop();
-      undoStack.current.push(redoState);
-      fabricRef.current.loadFromJSON(redoState, () => {
-        fabricRef.current.renderAll();
-      });
-    }
-  };
+
 
   // Update controls for selected object
   const updateControls = () => {
@@ -498,35 +469,8 @@ export default function App() {
     }
   };
 
-  const sendBackward = () => {
-    const canvas = fabricRef.current;
-    const activeObject = canvas.getActiveObject();
-    if (activeObject) {
-      canvas.sendBackwards(activeObject);
-      canvas.requestRenderAll();
-      saveState();
-    }
-  };
-
-  const bringToFront = () => {
-    const canvas = fabricRef.current;
-    const activeObject = canvas.getActiveObject();
-    if (activeObject) {
-      canvas.bringToFront(activeObject);
-      canvas.requestRenderAll();
-      saveState();
-    }
-  };
-
-  const sendToBack = () => {
-    const canvas = fabricRef.current;
-    const activeObject = canvas.getActiveObject();
-    if (activeObject) {
-      canvas.sendToBack(activeObject);
-      canvas.requestRenderAll();
-      saveState();
-    }
-  };
+  
+ 
 
   // Clear canvas (except background)
   const clearCanvas = () => {
@@ -618,6 +562,7 @@ export default function App() {
     return () => {
       if (fabricRef.current) {
         fabricRef.current.dispose();
+        fabricRef.current = null;
       }
     };
   }, []);
@@ -1187,29 +1132,12 @@ export default function App() {
           </label>
         </div>
 
-        {/* Layer controls */}
-        <div className="control-group">
-          <button onClick={bringToFront} className="button button-pink">
-            Bring to Front
-          </button>
-          <button onClick={sendToBack} className="button button-pink">
-            Send to Back
-          </button>
-          <button onClick={bringForward} className="button button-pink">
-            Bring Forward
-          </button>
-          <button onClick={sendBackward} className="button button-pink">
-            Send Backward
-          </button>
-        </div>
+      
 
         {/* Action buttons */}
         <div className="action-buttons">
           <button onClick={undo} className="button button-warning">
             Undo
-          </button>
-          <button onClick={redo} className="button button-warning">
-            Redo
           </button>
           <button onClick={deleteSelected} className="button button-danger">
             Delete Selected
@@ -1220,12 +1148,12 @@ export default function App() {
           <button onClick={selectAll} className="button button-purple">
             Select All
           </button>
-          <button 
+          {/* <button 
             onClick={() => setIsSignatureModalOpen(true)} 
             className="button button-teal"
           >
             Add Signature
-          </button>
+          </button> */}
           <button onClick={exportAsImage} className="button button-primary">
             Export as PNG
           </button>
