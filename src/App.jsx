@@ -10,6 +10,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs
 export default function App() {
   const canvasRef = useRef(null);
   const fabricRef = useRef(null);
+  const appContainerRef = useRef(null);
 
   // States
   const [newText, setNewText] = useState("");
@@ -34,6 +35,10 @@ export default function App() {
   // Signature modal state
   const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false);
 
+  // Mobile state
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [showControls, setShowControls] = useState(false);
+
   // Undo / redo stack
   const undoStack = useRef([]);
   const redoStack = useRef([]);
@@ -42,12 +47,69 @@ export default function App() {
     cornerColor: "red",
     cornerStrokeColor: "black",
     cornerStyle: "circle",
-    cornerSize: 14,
+    cornerSize: 10,
     transparentCorners: false,
+    borderColor: 'red',
+    cornerSize: 8,
+    padding: 5
   });
 
+  // Handle window resize
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      
+      if (fabricRef.current && imageSrc) {
+        const canvas = fabricRef.current;
+        const container = appContainerRef.current;
+        if (!container) return;
+        
+        // Calculate new dimensions maintaining aspect ratio
+        const img = canvas.backgroundImage;
+        if (!img) return;
+        
+        const aspectRatio = img.width / img.height;
+        let newWidth = container.clientWidth - 40; // padding
+        let newHeight = newWidth / aspectRatio;
+        
+        // Limit height on mobile
+        if (mobile && newHeight > window.innerHeight * 0.6) {
+          newHeight = window.innerHeight * 0.6;
+          newWidth = newHeight * aspectRatio;
+        }
+        
+        canvas.setDimensions({ width: newWidth, height: newHeight });
+        
+        // Scale background image
+        img.scaleX = newWidth / img.width;
+        img.scaleY = newHeight / img.height;
+        canvas.renderAll();
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    handleResize(); // Initial call
+    
+    return () => window.removeEventListener('resize', handleResize);
+  }, [imageSrc]);
+
   // Initialize Fabric canvas with background
-  const initFabric = (bgUrl, width, height) => {
+  const initFabric = (bgUrl, originalWidth, originalHeight) => {
+    const container = appContainerRef.current;
+    if (!container) return;
+    
+    // Calculate dimensions maintaining aspect ratio
+    const aspectRatio = originalWidth / originalHeight;
+    let width = container.clientWidth - 40; // padding
+    let height = width / aspectRatio;
+    
+    // Limit height on mobile
+    if (isMobile && height > window.innerHeight * 0.6) {
+      height = window.innerHeight * 0.6;
+      width = height * aspectRatio;
+    }
+    
     const canvasElement = canvasRef.current;
     const fabricCanvas = new fabric.Canvas(canvasElement, {
       width,
@@ -59,15 +121,24 @@ export default function App() {
     });
 
     fabric.Image.fromURL(bgUrl, (img) => {
-      img.set({ selectable: false });
-      fabricCanvas.setBackgroundImage(
-        img,
-        fabricCanvas.renderAll.bind(fabricCanvas),
-        {
-          scaleX: width / img.width,
-          scaleY: height / img.height,
-        }
-      );
+      img.set({ 
+        selectable: false,
+        originX: 'left',
+        originY: 'top'
+      });
+      
+      // Scale image to fit canvas
+      const scaleX = width / img.width;
+      const scaleY = height / img.height;
+      
+      fabricCanvas.setBackgroundImage(img, () => {
+        fabricCanvas.renderAll();
+      }, {
+        scaleX,
+        scaleY,
+        originX: 'left',
+        originY: 'top'
+      });
     });
 
     fabricRef.current = fabricCanvas;
@@ -137,13 +208,15 @@ export default function App() {
     if (!newText.trim() || !fabricRef.current) return;
 
     const text = new fabric.IText(newText, {
-      left: 100,
-      top: 100,
-      fontSize,
+      left: 50,
+      top: 50,
+      fontSize: isMobile ? Math.min(fontSize, 20) : fontSize,
       fill: fontColor,
       fontFamily,
       textAlign,
       editable: true,
+      padding: 5,
+      borderColor: 'rgba(0,0,255,0.5)'
     });
 
     fabricRef.current.add(text).setActiveObject(text);
@@ -187,13 +260,13 @@ export default function App() {
       if (eraser) {
         const eraserBrush = new fabric.PencilBrush(fabricRef.current);
         eraserBrush.color = "rgba(0,0,0,1)";
-        eraserBrush.width = brushWidth;
+        eraserBrush.width = isMobile ? brushWidth * 0.7 : brushWidth;
         eraserBrush.globalCompositeOperation = "destination-out";
         fabricRef.current.freeDrawingBrush = eraserBrush;
       } else {
         const brush = new fabric.PencilBrush(fabricRef.current);
         brush.color = brushColor;
-        brush.width = brushWidth;
+        brush.width = isMobile ? brushWidth * 0.7 : brushWidth;
         brush.globalCompositeOperation = "source-over";
         fabricRef.current.freeDrawingBrush = brush;
       }
@@ -208,33 +281,35 @@ export default function App() {
 
     let shape;
     const commonProps = {
-      left: 100,
-      top: 100,
+      left: 50,
+      top: 50,
       fill: shapeFill,
       stroke: shapeStroke,
       strokeWidth: shapeStrokeWidth,
       selectable: true,
+      padding: 5,
+      borderColor: 'rgba(0,0,255,0.5)'
     };
 
     switch (shapeType) {
       case "rect":
         shape = new fabric.Rect({
           ...commonProps,
-          width: 100,
-          height: 100,
+          width: isMobile ? 80 : 100,
+          height: isMobile ? 80 : 100,
         });
         break;
       case "circle":
         shape = new fabric.Circle({
           ...commonProps,
-          radius: 50,
+          radius: isMobile ? 40 : 50,
         });
         break;
       case "triangle":
         shape = new fabric.Triangle({
           ...commonProps,
-          width: 100,
-          height: 100,
+          width: isMobile ? 80 : 100,
+          height: isMobile ? 80 : 100,
         });
         break;
       default:
@@ -251,14 +326,17 @@ export default function App() {
     if (!fabricRef.current) return;
 
     fabric.Image.fromURL(signatureData, (img) => {
+      const scale = isMobile ? 0.3 : 0.5;
       img.set({
-        left: 100,
-        top: 100,
-        scaleX: 0.5,
-        scaleY: 0.5,
+        left: 50,
+        top: 50,
+        scaleX: scale,
+        scaleY: scale,
         hasControls: true,
         hasBorders: true,
         selectable: true,
+        padding: 5,
+        borderColor: 'rgba(0,0,255,0.5)'
       });
       fabricRef.current.add(img).setActiveObject(img);
       fabricRef.current.renderAll();
@@ -322,7 +400,7 @@ export default function App() {
 
     const link = document.createElement("a");
     link.href = dataURL;
-    link.download = "certificate.png";
+    link.download = "esign-document.png";
     link.click();
   };
 
@@ -336,32 +414,40 @@ export default function App() {
       fabricRef.current = null;
     }
 
-    if (file.type === "application/pdf") {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      const page = await pdf.getPage(1);
-      const viewport = page.getViewport({ scale: 2 });
+    try {
+      if (file.type === "application/pdf") {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const page = await pdf.getPage(1);
+        
+        // Adjust scale based on device
+        const scale = isMobile ? 1.5 : 2;
+        const viewport = page.getViewport({ scale });
 
-      const tempCanvas = document.createElement("canvas");
-      const context = tempCanvas.getContext("2d");
-      tempCanvas.width = viewport.width;
-      tempCanvas.height = viewport.height;
+        const tempCanvas = document.createElement("canvas");
+        const context = tempCanvas.getContext("2d");
+        tempCanvas.width = viewport.width;
+        tempCanvas.height = viewport.height;
 
-      await page.render({ canvasContext: context, viewport }).promise;
+        await page.render({ canvasContext: context, viewport }).promise;
 
-      const dataUrl = tempCanvas.toDataURL("image/png");
-      setImageSrc(dataUrl);
-      initFabric(dataUrl, tempCanvas.width, tempCanvas.height);
-    } else if (file.type.startsWith("image/")) {
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => {
-        setImageSrc(url);
-        initFabric(url, img.width, img.height);
-      };
-      img.src = url;
-    } else {
-      alert("Unsupported file type.");
+        const dataUrl = tempCanvas.toDataURL("image/png");
+        setImageSrc(dataUrl);
+        initFabric(dataUrl, tempCanvas.width, tempCanvas.height);
+      } else if (file.type.startsWith("image/")) {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          setImageSrc(url);
+          initFabric(url, img.width, img.height);
+        };
+        img.src = url;
+      } else {
+        alert("Please upload a PDF or image file (JPEG, PNG)");
+      }
+    } catch (error) {
+      console.error("Error loading file:", error);
+      alert("Error loading file. Please try another file.");
     }
   };
 
@@ -376,16 +462,30 @@ export default function App() {
   }, []);
 
   return (
-    <div className="app-container">
-      <h1>E sign</h1>
+    <div className="app-container" ref={appContainerRef}>
+      <h1>E-Sign</h1>
 
-      <div className="controls-container">
-        <input
-          type="file"
-          accept="application/pdf,image/*"
-          onChange={handleFileChange}
-          className="file-input"
-        />
+      {isMobile && (
+        <button 
+          className="mobile-controls-toggle"
+          onClick={() => setShowControls(!showControls)}
+        >
+          {showControls ? 'Hide Controls' : 'Show Controls'}
+        </button>
+      )}
+
+      <div className={`controls-container ${isMobile ? (showControls ? 'mobile-visible' : 'mobile-hidden') : ''}`}>
+        <div className="file-input-group">
+          <label className="file-input-label">
+            Upload Document
+            <input
+              type="file"
+              accept="application/pdf,image/*"
+              onChange={handleFileChange}
+              className="file-input"
+            />
+          </label>
+        </div>
 
         <div className="text-input-group">
           <input
@@ -407,53 +507,57 @@ export default function App() {
 
         {/* Text styling controls */}
         <div className="control-group">
-          <label className="control-label">
-            Font Size:
-            <input
-              type="number"
-              min={8}
-              max={100}
-              value={fontSize}
-              onChange={(e) =>
-                updateActiveObjectStyle(
-                  "fontSize",
-                  parseInt(e.target.value, 10)
-                )
-              }
-              className="number-input"
-              disabled={isDrawingMode}
-            />
-          </label>
+          <div className="control-row">
+            <label className="control-label">
+              <span className="mobile-label">Size:</span>
+              <input
+                type="number"
+                min={8}
+                max={100}
+                value={fontSize}
+                onChange={(e) =>
+                  updateActiveObjectStyle(
+                    "fontSize",
+                    parseInt(e.target.value, 10)
+                  )
+                }
+                className="number-input"
+                disabled={isDrawingMode}
+              />
+            </label>
 
-          <label className="control-label">
-            Font Family:
-            <select
-              value={fontFamily}
-              onChange={(e) =>
-                updateActiveObjectStyle("fontFamily", e.target.value)
-              }
-              className="select-input"
-              disabled={isDrawingMode}
-            >
-              <option value="Arial">Arial</option>
-              <option value="Times New Roman">Times New Roman</option>
-              <option value="Courier New">Courier New</option>
-              <option value="Georgia">Georgia</option>
-              <option value="Verdana">Verdana</option>
-            </select>
-          </label>
+            <label className="control-label">
+              <span className="mobile-label">Font:</span>
+              <select
+                value={fontFamily}
+                onChange={(e) =>
+                  updateActiveObjectStyle("fontFamily", e.target.value)
+                }
+                className="select-input"
+                disabled={isDrawingMode}
+              >
+                <option value="Arial">Arial</option>
+                <option value="Times New Roman">Times New Roman</option>
+                <option value="Courier New">Courier New</option>
+                <option value="Georgia">Georgia</option>
+                <option value="Verdana">Verdana</option>
+              </select>
+            </label>
+          </div>
 
-          <label className="control-label">
-            Font Color:
-            <input
-              type="color"
-              value={fontColor}
-              onChange={(e) => updateActiveObjectStyle("fill", e.target.value)}
-              className="color-input"
-              title="Select font color"
-              disabled={isDrawingMode}
-            />
-          </label>
+          <div className="control-row">
+            <label className="control-label">
+              <span className="mobile-label">Color:</span>
+              <input
+                type="color"
+                value={fontColor}
+                onChange={(e) => updateActiveObjectStyle("fill", e.target.value)}
+                className="color-input"
+                title="Select font color"
+                disabled={isDrawingMode}
+              />
+            </label>
+          </div>
         </div>
 
         {/* Shape controls */}
@@ -461,138 +565,145 @@ export default function App() {
           <div className="shape-buttons">
             <button
               onClick={() => addShape("rect")}
-              className={`button ${
-                activeShape === "rect"
-                  ? "button-teal active"
-                  : "button-secondary"
-              }`}
+              className={`button ${activeShape === "rect" ? "button-teal active" : "button-secondary"}`}
             >
-              Rectangle
+              {isMobile ? '□' : 'Rectangle'}
             </button>
             <button
               onClick={() => addShape("circle")}
-              className={`button ${
-                activeShape === "circle"
-                  ? "button-teal active"
-                  : "button-secondary"
-              }`}
+              className={`button ${activeShape === "circle" ? "button-teal active" : "button-secondary"}`}
             >
-              Circle
+              {isMobile ? '○' : 'Circle'}
             </button>
             <button
               onClick={() => addShape("triangle")}
-              className={`button ${
-                activeShape === "triangle"
-                  ? "button-teal active"
-                  : "button-secondary"
-              }`}
+              className={`button ${activeShape === "triangle" ? "button-teal active" : "button-secondary"}`}
             >
-              Triangle
+              {isMobile ? '△' : 'Triangle'}
             </button>
           </div>
 
-          <label className="control-label">
-            Fill:
-            <input
-              type="color"
-              value={shapeFill}
-              onChange={(e) => updateActiveObjectStyle("fill", e.target.value)}
-              className="color-input"
-              disabled={isDrawingMode}
-            />
-          </label>
+          <div className="control-row">
+            <label className="control-label">
+              <span className="mobile-label">Fill:</span>
+              <input
+                type="color"
+                value={shapeFill}
+                onChange={(e) => updateActiveObjectStyle("fill", e.target.value)}
+                className="color-input"
+                disabled={isDrawingMode}
+              />
+            </label>
 
-          <label className="control-label">
-            Stroke:
-            <input
-              type="color"
-              value={shapeStroke}
-              onChange={(e) =>
-                updateActiveObjectStyle("stroke", e.target.value)
-              }
-              className="color-input"
-              disabled={isDrawingMode}
-            />
-          </label>
+            <label className="control-label">
+              <span className="mobile-label">Stroke:</span>
+              <input
+                type="color"
+                value={shapeStroke}
+                onChange={(e) =>
+                  updateActiveObjectStyle("stroke", e.target.value)
+                }
+                className="color-input"
+                disabled={isDrawingMode}
+              />
+            </label>
+          </div>
 
-          <label className="control-label">
-            Stroke Width:
-            <input
-              type="number"
-              min={1}
-              max={20}
-              value={shapeStrokeWidth}
-              onChange={(e) =>
-                updateActiveObjectStyle(
-                  "strokeWidth",
-                  parseInt(e.target.value, 10)
-                )
-              }
-              className="number-input"
-              disabled={isDrawingMode}
-            />
-          </label>
+          <div className="control-row">
+            <label className="control-label">
+              <span className="mobile-label">Stroke Width:</span>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={shapeStrokeWidth}
+                onChange={(e) =>
+                  updateActiveObjectStyle(
+                    "strokeWidth",
+                    parseInt(e.target.value, 10)
+                  )
+                }
+                className="number-input"
+                disabled={isDrawingMode}
+              />
+            </label>
+          </div>
         </div>
 
         {/* Drawing controls */}
         <div className="control-group">
-          <button
-            onClick={() => toggleDrawingMode(!isDrawingMode, false)}
-            className={`button button-success ${
-              isDrawingMode && !isEraserMode ? "active" : ""
-            }`}
-            title="Toggle drawing mode"
-          >
-            {isDrawingMode && !isEraserMode
-              ? "Disable Drawing"
-              : "Enable Drawing"}
-          </button>
+          <div className="control-row">
+            <button
+              onClick={() => toggleDrawingMode(!isDrawingMode, false)}
+              className={`button button-success ${isDrawingMode && !isEraserMode ? "active" : ""}`}
+              title="Toggle drawing mode"
+            >
+              {isMobile ? '✏️' : (isDrawingMode && !isEraserMode ? 'Disable Drawing' : 'Enable Drawing')}
+            </button>
 
-          <label className="control-label">
-            Brush Color:
-            <input
-              type="color"
-              value={brushColor}
-              onChange={(e) => setBrushColor(e.target.value)}
-              disabled={isDrawingMode && isEraserMode}
-              className="color-input"
-            />
-          </label>
+            <button
+              onClick={() => toggleDrawingMode(!isDrawingMode, true)}
+              className={`button button-warning ${isEraserMode ? "active" : ""}`}
+              title="Toggle eraser mode"
+            >
+              {isMobile ? '🧽' : 'Eraser'}
+            </button>
+          </div>
 
-          <label className="control-label">
-            Brush Width:
-            <input
-              type="number"
-              min={1}
-              max={50}
-              value={brushWidth}
-              onChange={(e) => setBrushWidth(parseInt(e.target.value, 10))}
-              className="number-input"
-            />
-          </label>
+          <div className="control-row">
+            <label className="control-label">
+              <span className="mobile-label">Color:</span>
+              <input
+                type="color"
+                value={brushColor}
+                onChange={(e) => setBrushColor(e.target.value)}
+                disabled={isDrawingMode && isEraserMode}
+                className="color-input"
+              />
+            </label>
+
+            <label className="control-label">
+              <span className="mobile-label">Width:</span>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={brushWidth}
+                onChange={(e) => setBrushWidth(parseInt(e.target.value, 10))}
+                className="number-input"
+              />
+            </label>
+          </div>
         </div>
+
         <div className="action-buttons">
-          <button onClick={undo} className="button button-warning">
-            Undo
-          </button>
-          <button onClick={deleteSelected} className="button button-danger">
-            Delete Selected
-          </button>
-          <button onClick={clearCanvas} className="button button-secondary">
-            Clear All
-          </button>
-          <button onClick={selectAll} className="button button-purple">
-            Select All
-          </button>
-          <button onClick={exportAsImage} className="button button-primary">
-            Export as PNG
-          </button>
-          <button
-            onClick={() => setIsSignatureModalOpen(true)}
-            className="button button-teal"
-          >
-            Add Signature
-          </button>
+          <div className="button-row">
+            <button onClick={undo} className="button button-warning" title="Undo">
+              {isMobile ? '↩️' : 'Undo'}
+            </button>
+            <button onClick={deleteSelected} className="button button-danger" title="Delete">
+              {isMobile ? '🗑️' : 'Delete'}
+            </button>
+            <button onClick={clearCanvas} className="button button-secondary" title="Clear All">
+              {isMobile ? '🧹' : 'Clear All'}
+            </button>
+          </div>
+          
+          <div className="button-row">
+            <button onClick={selectAll} className="button button-purple" title="Select All">
+              {isMobile ? '☑️' : 'Select All'}
+            </button>
+            <button onClick={exportAsImage} className="button button-primary" title="Export">
+              {isMobile ? '💾' : 'Export'}
+            </button>
+            <button
+              onClick={() => setIsSignatureModalOpen(true)}
+              className="button button-teal"
+              title="Signature"
+            >
+              {isMobile ? '✍️' : 'Signature'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -606,6 +717,7 @@ export default function App() {
         isOpen={isSignatureModalOpen}
         onClose={() => setIsSignatureModalOpen(false)}
         onAddSignature={addSignatureToCanvas}
+        isMobile={isMobile}
       />
     </div>
   );
