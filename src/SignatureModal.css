@@ -51,6 +51,7 @@ h2 {
   display: flex;
   gap: 12px;
   margin-bottom: 18px;
+  width: 100%;
 }
 
 .mode-buttons button {
@@ -163,4 +164,72 @@ img {
 
 .add-button:hover {
   background-color: #1e7e34;
+}
+
+/* Typed Signature Mode Styles */
+
+input[type="text"] {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 18px;
+  border-radius: 6px;
+  border: 1.5px solid #ccc;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+
+/* Font preview cards container */
+.font-preview-container {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+/* Individual font preview card */
+.font-preview-card {
+  cursor: pointer;
+  border: 2px solid #ccc;
+  border-radius: 8px;
+  padding: 12px;
+  min-width: 120px;
+  min-height: 60px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 28px;
+  color: #222;
+  user-select: none;
+  transition: border-color 0.3s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.font-preview-card:hover {
+  border-color: #007bff;
+}
+
+.font-preview-card.selected {
+  border: 3px solid #007bff;
+}
+
+/* Preview box for typed signature */
+.typed-signature-canvas {
+  border: 2px solid #007bff;
+  border-radius: 8px;
+  margin-top: 10px;
+  background-color: transparent;
+  width: 100%;
+  max-width: 400px;
+  height: 200px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  user-select: none;
+  color: #000;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
