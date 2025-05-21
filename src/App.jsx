@@ -58,7 +58,7 @@ export default function CertificateGenerator() {
   useEffect(() => {
     if (settings.pageSize === 'a4') {
       if (settings.orientation === 'landscape') {
-        setCanvasDimensions({ width: 1122, height: 793 }); // A4 landscape in pixels (96dpi)
+        setCanvasDimensions({ width: 1030, height: 793 }); // A4 landscape in pixels (96dpi)
       } else {
         setCanvasDimensions({ width: 793, height: 1122 }); // A4 portrait
       }
@@ -391,14 +391,14 @@ export default function CertificateGenerator() {
             <PictureAsPdf />
           </Avatar>
           <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-            Certificate Generator Pro
+            Certificate Generator
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Tooltip title="Save current layout">
-            <Button variant="outlined" startIcon={<Save />} onClick={saveLayout} color="secondary">
+            {/* <Button variant="outlined" startIcon={<Save />} onClick={saveLayout} color="secondary">
               Save Layout
-            </Button>
+            </Button> */}
           </Tooltip>
           <input
             type="file"
@@ -407,14 +407,14 @@ export default function CertificateGenerator() {
             accept=".json"
             style={{ display: 'none' }}
           />
-          <Button
+          {/* <Button
             variant="contained"
             startIcon={<Upload />}
             onClick={() => layoutInputRef.current.click()}
             color="secondary"
           >
             Load Layout
-          </Button>
+          </Button> */}
         </Box>
       </Box>
 
