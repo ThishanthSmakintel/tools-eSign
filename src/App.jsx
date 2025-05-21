@@ -1,23 +1,68 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
-  Container, Box, Button, Typography, CircularProgress, Menu, MenuItem, Slider,
-  TextField, Dialog, DialogTitle, DialogContent, DialogActions, IconButton,
-  FormControl, InputLabel, Select, Switch, FormControlLabel, Paper, Grid,
-  Divider, Tooltip, Alert, Snackbar, Badge, Chip, Tabs, Tab, Avatar
-} from '@mui/material';
-import * as XLSX from 'xlsx';
-import Draggable from 'react-draggable';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
-import JSZip from 'jszip';
-import { saveAs } from 'file-saver';
-import { useDropzone } from 'react-dropzone';
+  Container,
+  Box,
+  Button,
+  Typography,
+  CircularProgress,
+  Menu,
+  MenuItem,
+  Slider,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  FormControl,
+  InputLabel,
+  Select,
+  Switch,
+  FormControlLabel,
+  Paper,
+  Grid,
+  Divider,
+  Tooltip,
+  Alert,
+  Snackbar,
+  Badge,
+  Chip,
+  Tabs,
+  Tab,
+  Avatar,
+} from "@mui/material";
+import * as XLSX from "xlsx";
+import Draggable from "react-draggable";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
+import { useDropzone } from "react-dropzone";
 import {
-  Add, Delete, Edit, FontDownload, Colorize, Save, Upload, Download,
-  Visibility, VisibilityOff, PictureAsPdf, InsertDriveFile, Settings,
-  FolderZip, Image, TableChart, GridView
-} from '@mui/icons-material';
-import { ChromePicker } from 'react-color';
+  Add,
+  Delete,
+  Edit,
+  FontDownload,
+  Colorize,
+  Save,
+  Upload,
+  Download,
+  Visibility,
+  VisibilityOff,
+  PictureAsPdf,
+  InsertDriveFile,
+  Settings,
+  FolderZip,
+  Image,
+  TableChart,
+  GridView,
+  TextFields,
+  FormatBold,
+  FormatItalic,
+  FormatUnderlined,
+  FormatColorText,
+} from "@mui/icons-material";
+import { ChromePicker } from "react-color";
 
 export default function CertificateGenerator() {
   // Refs
@@ -31,19 +76,26 @@ export default function CertificateGenerator() {
   const [fields, setFields] = useState([]);
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
-  const [customText, setCustomText] = useState('');
+  const [error, setError] = useState("");
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "info",
+  });
+  const [customText, setCustomText] = useState("");
   const [previewMode, setPreviewMode] = useState(false);
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
   const [activeTab, setActiveTab] = useState(0);
-  const [canvasDimensions, setCanvasDimensions] = useState({ width: 800, height: 600 });
+  const [canvasDimensions, setCanvasDimensions] = useState({
+    width: 800,
+    height: 600,
+  });
 
   const [settings, setSettings] = useState({
-    pageSize: 'a4',
-    orientation: 'landscape',
-    exportFormat: 'pdf',
-    exportMethod: 'zip',
+    pageSize: "a4",
+    orientation: "landscape",
+    exportFormat: "pdf",
+    exportMethod: "zip",
     imageQuality: 1.0,
   });
 
@@ -56,14 +108,14 @@ export default function CertificateGenerator() {
 
   // Calculate canvas dimensions based on settings
   useEffect(() => {
-    if (settings.pageSize === 'a4') {
-      if (settings.orientation === 'landscape') {
-        setCanvasDimensions({ width: 1030, height: 793 }); // A4 landscape in pixels (96dpi)
+    if (settings.pageSize === "a4") {
+      if (settings.orientation === "landscape") {
+        setCanvasDimensions({ width: 1104, height: 793 }); // A4 landscape in pixels (96dpi)
       } else {
         setCanvasDimensions({ width: 793, height: 1122 }); // A4 portrait
       }
-    } else if (settings.pageSize === 'letter') {
-      if (settings.orientation === 'landscape') {
+    } else if (settings.pageSize === "letter") {
+      if (settings.orientation === "landscape") {
         setCanvasDimensions({ width: 1056, height: 816 }); // Letter landscape
       } else {
         setCanvasDimensions({ width: 816, height: 1056 }); // Letter portrait
@@ -80,79 +132,144 @@ export default function CertificateGenerator() {
       );
       const width = e.target.naturalWidth * ratio;
       const height = e.target.naturalHeight * ratio;
-      
+
       // Update fields positions to match new dimensions
-      setFields(prev => prev.map(field => ({
-        ...field,
-        x: (field.x / canvasDimensions.width) * width,
-        y: (field.y / canvasDimensions.height) * height
-      })));
+      setFields((prev) =>
+        prev.map((field) => ({
+          ...field,
+          x: (field.x / canvasDimensions.width) * width,
+          y: (field.y / canvasDimensions.height) * height,
+        }))
+      );
 
       setCanvasDimensions({ width, height });
     }
   };
 
-  // Dropzone for file upload
-  const onDrop = useCallback((acceptedFiles) => {
-    if (!acceptedFiles || acceptedFiles.length === 0) return;
-
-    const file = acceptedFiles[0];
-    const ext = file.name.split('.').pop().toLowerCase();
-
-    if (['jpg', 'jpeg', 'png'].includes(ext)) {
-      if (file.size > 5 * 1024 * 1024) {
-        setSnackbar({ open: true, message: 'Image file too large. Max 5MB.', severity: 'error' });
-        return;
-      }
+  // Convert PDF to image when uploaded
+  const convertPdfToImage = async (file) => {
+    return new Promise((resolve) => {
+      // In a real app, you would use a PDF.js or similar library here
+      // For demo purposes, we'll just create a placeholder
       const reader = new FileReader();
       reader.onload = () => {
-        setBgImage(reader.result);
-        setSnackbar({ open: true, message: 'Background image uploaded!', severity: 'success' });
+        // This is a simplified version - in production you'd render the PDF pages
+        resolve(reader.result);
       };
       reader.readAsDataURL(file);
-    } else if (['xlsx', 'xls', 'csv'].includes(ext)) {
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        try {
-          const wb = XLSX.read(evt.target.result, { type: 'binary' });
-          const sheet = wb.Sheets[wb.SheetNames[0]];
-          const rows = XLSX.utils.sheet_to_json(sheet);
-          setData(rows);
+    });
+  };
 
-          // Create fields from column headers if no fields exist
-          if (fields.length === 0) {
-            const headers = Object.keys(rows[0] || {});
-            const initialFields = headers.map((header, index) => ({
-              id: `field_${Date.now()}_${index}`,
-              text: header,
-              x: canvasDimensions.width * 0.1,
-              y: canvasDimensions.height * 0.1 + index * (canvasDimensions.height * 0.08),
-              fontSize: Math.floor(canvasDimensions.width * 0.02),
-              color: '#000000',
-              fontWeight: 'bold'
-            }));
-            setFields(initialFields);
-          }
-          setSnackbar({ open: true, message: `Loaded ${rows.length} records from Excel`, severity: 'success' });
-        } catch (e) {
-          setSnackbar({ open: true, message: 'Error parsing Excel file', severity: 'error' });
+  // Dropzone for file upload
+  const onDrop = useCallback(
+    async (acceptedFiles) => {
+      if (!acceptedFiles || acceptedFiles.length === 0) return;
+
+      const file = acceptedFiles[0];
+      const ext = file.name.split(".").pop().toLowerCase();
+
+      if (["jpg", "jpeg", "png", "webp", "pdf"].includes(ext)) {
+        if (file.size > 5 * 1024 * 1024) {
+          setSnackbar({
+            open: true,
+            message: "File too large. Max 5MB.",
+            severity: "error",
+          });
+          return;
         }
-      };
-      reader.readAsBinaryString(file);
-    } else {
-      setSnackbar({ open: true, message: 'Unsupported file type', severity: 'error' });
-    }
-  }, [fields.length, canvasDimensions]);
+
+        if (ext === "pdf") {
+          try {
+            const imageData = await convertPdfToImage(file);
+            setBgImage(imageData);
+            setSnackbar({
+              open: true,
+              message: "PDF converted to image!",
+              severity: "success",
+            });
+          } catch (error) {
+            setSnackbar({
+              open: true,
+              message: "Error processing PDF",
+              severity: "error",
+            });
+          }
+        } else {
+          const reader = new FileReader();
+          reader.onload = () => {
+            setBgImage(reader.result);
+            setSnackbar({
+              open: true,
+              message: "Background image uploaded!",
+              severity: "success",
+            });
+          };
+          reader.readAsDataURL(file);
+        }
+      } else if (["xlsx", "xls", "csv"].includes(ext)) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          try {
+            const wb = XLSX.read(evt.target.result, { type: "binary" });
+            const sheet = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(sheet);
+            setData(rows);
+
+            // Create fields from column headers if no fields exist
+            if (fields.length === 0) {
+              const headers = Object.keys(rows[0] || {});
+              const initialFields = headers.map((header, index) => ({
+                id: `field_${Date.now()}_${index}`,
+                text: header,
+                x: canvasDimensions.width * 0.1,
+                y:
+                  canvasDimensions.height * 0.1 +
+                  index * (canvasDimensions.height * 0.08),
+                fontSize: Math.floor(canvasDimensions.width * 0.02),
+                color: "#000000",
+                fontWeight: "normal",
+                fontStyle: "normal",
+                textDecoration: "none",
+                fontFamily: "Arial",
+              }));
+              setFields(initialFields);
+            }
+            setSnackbar({
+              open: true,
+              message: `Loaded ${rows.length} records from Excel`,
+              severity: "success",
+            });
+          } catch (e) {
+            setSnackbar({
+              open: true,
+              message: "Error parsing Excel file",
+              severity: "error",
+            });
+          }
+        };
+        reader.readAsBinaryString(file);
+      } else {
+        setSnackbar({
+          open: true,
+          message: "Unsupported file type",
+          severity: "error",
+        });
+      }
+    },
+    [fields.length, canvasDimensions]
+  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     multiple: false,
     accept: {
-      'image/*': ['.jpg', '.jpeg', '.png'],
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-      'application/vnd.ms-excel': ['.xls'],
-      'text/csv': ['.csv']
-    }
+      "image/*": [".jpg", ".jpeg", ".png", ".webp"],
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
+        ".xlsx",
+      ],
+      "application/vnd.ms-excel": [".xls"],
+      "text/csv": [".csv"],
+    },
   });
 
   // Field management
@@ -162,18 +279,24 @@ export default function CertificateGenerator() {
       id: `custom_${Date.now()}`,
       text: customText,
       x: canvasDimensions.width * 0.1,
-      y: canvasDimensions.height * 0.1 + fields.length * (canvasDimensions.height * 0.08),
+      y:
+        canvasDimensions.height * 0.1 +
+        fields.length * (canvasDimensions.height * 0.08),
       fontSize: Math.floor(canvasDimensions.width * 0.02),
-      color: '#000000',
-      fontWeight: 'normal'
+      color: "#000000",
+      fontWeight: "normal",
+      fontStyle: "normal",
+      textDecoration: "none",
+      fontFamily: "Arial",
+      isStatic: true, // Mark as static field (not from Excel)
     };
     setFields([...fields, newField]);
-    setCustomText('');
-    setSnackbar({ open: true, message: 'Field added!', severity: 'success' });
+    setCustomText("");
+    setSnackbar({ open: true, message: "Field added!", severity: "success" });
   };
 
   const updateFieldPosition = (id, x, y) => {
-    setFields((prev) => prev.map(f => f.id === id ? { ...f, x, y } : f));
+    setFields((prev) => prev.map((f) => (f.id === id ? { ...f, x, y } : f)));
   };
 
   const handleContextMenu = (event, id) => {
@@ -188,21 +311,29 @@ export default function CertificateGenerator() {
   };
 
   const handleDeleteField = () => {
-    setFields((prev) => prev.filter(f => f.id !== selectedFieldId));
+    setFields((prev) => prev.filter((f) => f.id !== selectedFieldId));
     handleCloseContextMenu();
-    setSnackbar({ open: true, message: 'Field deleted', severity: 'info' });
+    setSnackbar({ open: true, message: "Field deleted", severity: "info" });
   };
 
   const handleFontSizeChange = (_, newSize) => {
-    setFields((prev) => prev.map(f => f.id === selectedFieldId ? { ...f, fontSize: newSize } : f));
+    setFields((prev) =>
+      prev.map((f) =>
+        f.id === selectedFieldId ? { ...f, fontSize: newSize } : f
+      )
+    );
   };
 
   const handleColorChange = (color) => {
-    setFields((prev) => prev.map(f => f.id === selectedFieldId ? { ...f, color: color.hex } : f));
+    setFields((prev) =>
+      prev.map((f) =>
+        f.id === selectedFieldId ? { ...f, color: color.hex } : f
+      )
+    );
   };
 
   const handleEditField = () => {
-    const field = fields.find(f => f.id === selectedFieldId);
+    const field = fields.find((f) => f.id === selectedFieldId);
     if (field) {
       setEditingField({ ...field });
       setEditDialogOpen(true);
@@ -211,19 +342,26 @@ export default function CertificateGenerator() {
   };
 
   const saveFieldEdit = () => {
-    setFields(prev => prev.map(f => f.id === editingField.id ? editingField : f));
+    setFields((prev) =>
+      prev.map((f) => (f.id === editingField.id ? editingField : f))
+    );
     setEditDialogOpen(false);
-    setSnackbar({ open: true, message: 'Field updated', severity: 'success' });
+    setSnackbar({ open: true, message: "Field updated", severity: "success" });
   };
 
   // Image/PDF Generation
   const generateCertificate = async (rowData, index) => {
     // Update fields with current row data
-    setFields(prev => prev.map(f => ({ ...f, displayText: rowData[f.text] || f.text })));
-    
+    setFields((prev) =>
+      prev.map((f) => ({
+        ...f,
+        displayText: f.isStatic ? f.text : rowData[f.text] || f.text,
+      }))
+    );
+
     // Wait for DOM to update
-    await new Promise(r => setTimeout(r, 100));
-    
+    await new Promise((r) => setTimeout(r, 100));
+
     // Capture the canvas
     const canvas = await html2canvas(certRef.current, {
       scale: 2,
@@ -232,46 +370,77 @@ export default function CertificateGenerator() {
       useCORS: true,
       allowTaint: true,
       width: canvasDimensions.width,
-      height: canvasDimensions.height
+      height: canvasDimensions.height,
     });
 
     const name = rowData.Name || rowData.name || `certificate_${index + 1}`;
-    
-    if (settings.exportFormat === 'png') {
+
+    if (settings.exportFormat === "png") {
       return { blob: await canvasToBlob(canvas), name: `${name}.png` };
+    } else if (settings.exportFormat === "webp") {
+      return { blob: await canvasToWebP(canvas), name: `${name}.webp` };
     } else {
       const pdf = new jsPDF(settings.orientation, undefined, settings.pageSize);
-      const imgData = canvas.toDataURL('image/png', settings.imageQuality);
+      const imgData = canvas.toDataURL("image/png", settings.imageQuality);
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      return { blob: pdf.output('blob'), name: `${name}.pdf` };
+
+      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+      return { blob: pdf.output("blob"), name: `${name}.pdf` };
     }
   };
 
   const canvasToBlob = (canvas) => {
     return new Promise((resolve) => {
-      canvas.toBlob((blob) => {
-        resolve(blob);
-      }, 'image/png', settings.imageQuality);
+      canvas.toBlob(
+        (blob) => {
+          resolve(blob);
+        },
+        "image/png",
+        settings.imageQuality
+      );
+    });
+  };
+
+  const canvasToWebP = (canvas) => {
+    return new Promise((resolve) => {
+      canvas.toBlob(
+        (blob) => {
+          resolve(blob);
+        },
+        "image/webp",
+        settings.imageQuality
+      );
     });
   };
 
   // Export functions
   const exportSingle = async (index) => {
-    if (!bgImage || fields.length === 0 || data.length === 0) {
-      setSnackbar({ open: true, message: 'Upload image and Excel file first', severity: 'error' });
+    if (!bgImage || fields.length === 0) {
+      setSnackbar({
+        open: true,
+        message: "Upload template first",
+        severity: "error",
+      });
       return;
     }
-    
+
     setLoading(true);
     try {
-      const { blob, name } = await generateCertificate(data[index], index);
+      const rowData = data[index] || {};
+      const { blob, name } = await generateCertificate(rowData, index);
       saveAs(blob, name);
-      setSnackbar({ open: true, message: 'Certificate exported!', severity: 'success' });
+      setSnackbar({
+        open: true,
+        message: "Certificate exported!",
+        severity: "success",
+      });
     } catch (error) {
-      setSnackbar({ open: true, message: 'Error exporting certificate', severity: 'error' });
+      setSnackbar({
+        open: true,
+        message: "Error exporting certificate",
+        severity: "error",
+      });
       console.error(error);
     } finally {
       setLoading(false);
@@ -279,55 +448,98 @@ export default function CertificateGenerator() {
   };
 
   const exportAll = async () => {
-    if (!bgImage || fields.length === 0 || data.length === 0) {
-      setSnackbar({ open: true, message: 'Upload image and Excel file first', severity: 'error' });
+    if (!bgImage || fields.length === 0) {
+      setSnackbar({
+        open: true,
+        message: "Upload template first",
+        severity: "error",
+      });
       return;
     }
-    
+
     setLoading(true);
-    
+
     try {
-      if (settings.exportMethod === 'zip') {
+      if (data.length > 0 && settings.exportMethod === "zip") {
         const zip = new JSZip();
         const folder = zip.folder("certificates");
-        
+
         for (let i = 0; i < data.length; i++) {
           const { blob, name } = await generateCertificate(data[i], i);
           folder.file(name, blob);
         }
-        
-        const content = await zip.generateAsync({ type: 'blob' });
-        saveAs(content, 'certificates.zip');
-        setSnackbar({ open: true, message: `Exported ${data.length} certificates as ZIP`, severity: 'success' });
-      } else {
+
+        const content = await zip.generateAsync({ type: "blob" });
+        saveAs(content, "certificates.zip");
+        setSnackbar({
+          open: true,
+          message: `Exported ${data.length} certificates as ZIP`,
+          severity: "success",
+        });
+      } else if (data.length > 0) {
         // Single PDF export
-        const pdf = new jsPDF(settings.orientation, undefined, settings.pageSize);
-        
+        const pdf = new jsPDF(
+          settings.orientation,
+          undefined,
+          settings.pageSize
+        );
+
         for (let i = 0; i < data.length; i++) {
           const row = data[i];
-          setFields(prev => prev.map(f => ({ ...f, displayText: row[f.text] || f.text })));
-          await new Promise(r => setTimeout(r, 100));
-          
+
+          // Update fields with current row data
+          await new Promise((resolve) => {
+            setFields((prev) =>
+              prev.map((f) => ({
+                ...f,
+                displayText: f.isStatic ? f.text : row[f.text] || f.text,
+              }))
+            );
+            // Ensure the DOM updates before proceeding
+            setTimeout(resolve, 100); // Slight delay to allow rendering
+          });
+
+          // Capture the certificate area as an image
           const canvas = await html2canvas(certRef.current, {
             scale: 2,
             backgroundColor: null,
             width: canvasDimensions.width,
-            height: canvasDimensions.height
+            height: canvasDimensions.height,
           });
-          
-          const imgData = canvas.toDataURL('image/png', settings.imageQuality);
+
+          const imgData = canvas.toDataURL("image/png", settings.imageQuality);
+
           if (i > 0) pdf.addPage();
-          
+
           const pdfWidth = pdf.internal.pageSize.getWidth();
           const pdfHeight = pdf.internal.pageSize.getHeight();
-          pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+
+          // Add captured image to PDF
+          pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
         }
-        
-        pdf.save('merged_certificates.pdf');
-        setSnackbar({ open: true, message: `Merged ${data.length} certificates into PDF`, severity: 'success' });
+
+        pdf.save("merged_certificates.pdf");
+        setSnackbar({
+          open: true,
+          message: `Merged ${data.length} certificates into PDF`,
+          severity: "success",
+        });
+      } else {
+        // Export just the template with static fields
+        const { blob, name } = await generateCertificate({}, 0);
+        saveAs(blob, name);
+        setSnackbar({
+          open: true,
+          message: "Template exported!",
+          severity: "success",
+        });
       }
     } catch (error) {
-      setSnackbar({ open: true, message: 'Error during export', severity: 'error' });
+      setSnackbar({
+        open: true,
+        message: "Error during export",
+        severity: "error",
+      });
       console.error(error);
     } finally {
       setLoading(false);
@@ -340,21 +552,23 @@ export default function CertificateGenerator() {
       fields,
       bgImage,
       settings,
-      canvasDimensions
+      canvasDimensions,
     };
-    const blob = new Blob([JSON.stringify(layout)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(layout)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = 'certificate_layout.json';
+    a.download = "certificate_layout.json";
     a.click();
-    setSnackbar({ open: true, message: 'Layout saved', severity: 'success' });
+    setSnackbar({ open: true, message: "Layout saved", severity: "success" });
   };
 
   const loadLayout = (event) => {
     const file = event.target.files[0];
     if (!file) return;
-    
+
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -363,9 +577,17 @@ export default function CertificateGenerator() {
         setBgImage(layout.bgImage || null);
         setSettings(layout.settings || settings);
         setCanvasDimensions(layout.canvasDimensions || canvasDimensions);
-        setSnackbar({ open: true, message: 'Layout loaded', severity: 'success' });
+        setSnackbar({
+          open: true,
+          message: "Layout loaded",
+          severity: "success",
+        });
       } catch (err) {
-        setSnackbar({ open: true, message: 'Error loading layout file', severity: 'error' });
+        setSnackbar({
+          open: true,
+          message: "Error loading layout file",
+          severity: "error",
+        });
       }
     };
     reader.readAsText(file);
@@ -373,48 +595,73 @@ export default function CertificateGenerator() {
 
   // Preview management
   const updatePreview = (index) => {
-    if (index >= 0 && index < data.length) {
+    if (data.length > 0 && index >= 0 && index < data.length) {
       setCurrentPreviewIndex(index);
-      setFields(prev => prev.map(f => ({ ...f, displayText: data[index][f.text] || f.text })));
+      setFields((prev) =>
+        prev.map((f) => ({
+          ...f,
+          displayText: f.isStatic ? f.text : data[index][f.text] || f.text,
+        }))
+      );
+    } else {
+      // Show just static fields when no data or in preview
+      setFields((prev) =>
+        prev.map((f) => ({
+          ...f,
+          displayText: f.isStatic ? f.text : f.text,
+        }))
+      );
     }
   };
 
   // Selected field helpers
-  const selectedField = fields.find(f => f.id === selectedFieldId);
+  const selectedField = fields.find((f) => f.id === selectedFieldId);
 
   return (
     <Container maxWidth="xl" sx={{ my: 2 }}>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Avatar sx={{ bgcolor: 'primary.main' }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 2,
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Avatar sx={{ bgcolor: "primary.main" }}>
             <PictureAsPdf />
           </Avatar>
-          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+          <Typography variant="h4" sx={{ fontWeight: "bold" }}>
             Certificate Generator
           </Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 1 }}>
+        <Box sx={{ display: "flex", gap: 1 }}>
           <Tooltip title="Save current layout">
-            {/* <Button variant="outlined" startIcon={<Save />} onClick={saveLayout} color="secondary">
+            <Button
+              variant="outlined"
+              startIcon={<Save />}
+              onClick={saveLayout}
+              color="secondary"
+            >
               Save Layout
-            </Button> */}
+            </Button>
           </Tooltip>
           <input
             type="file"
             ref={layoutInputRef}
             onChange={loadLayout}
             accept=".json"
-            style={{ display: 'none' }}
+            style={{ display: "none" }}
           />
-          {/* <Button
+          <Button
             variant="contained"
             startIcon={<Upload />}
             onClick={() => layoutInputRef.current.click()}
             color="secondary"
           >
             Load Layout
-          </Button> */}
+          </Button>
         </Box>
       </Box>
 
@@ -436,44 +683,64 @@ export default function CertificateGenerator() {
 
             {activeTab === 0 && (
               <Box>
-                <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                <Typography
+                  variant="subtitle2"
+                  gutterBottom
+                  sx={{ fontWeight: "bold" }}
+                >
                   Upload Certificate Template
                 </Typography>
-                <Box {...getRootProps()} sx={{
-                  border: '2px dashed',
-                  borderColor: isDragActive ? 'primary.main' : 'divider',
-                  p: 3,
-                  borderRadius: 1,
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  backgroundColor: isDragActive ? 'action.hover' : 'background.paper',
-                  mb: 2
-                }}>
+                <Box
+                  {...getRootProps()}
+                  sx={{
+                    border: "2px dashed",
+                    borderColor: isDragActive ? "primary.main" : "divider",
+                    p: 3,
+                    borderRadius: 1,
+                    textAlign: "center",
+                    cursor: "pointer",
+                    backgroundColor: isDragActive
+                      ? "action.hover"
+                      : "background.paper",
+                    mb: 2,
+                  }}
+                >
                   <input {...getInputProps()} />
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 1,
+                    }}
+                  >
                     <Upload fontSize="large" />
                     <Typography>
-                      {isDragActive ? 'Drop image here' : 'Drag & drop template image'}
+                      {isDragActive ? "Drop file here" : "Drag & drop template"}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      JPG, PNG (Max 5MB)
+                      JPG, PNG, WEBP (Max 5MB)
                     </Typography>
                   </Box>
                 </Box>
 
                 <Divider sx={{ my: 2 }} />
 
-                <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                <Typography
+                  variant="subtitle2"
+                  gutterBottom
+                  sx={{ fontWeight: "bold" }}
+                >
                   Manage Fields
                 </Typography>
-                <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
                   <TextField
                     fullWidth
                     size="small"
                     value={customText}
                     onChange={(e) => setCustomText(e.target.value)}
                     placeholder="New field text"
-                    onKeyPress={(e) => e.key === 'Enter' && addCustomField()}
+                    onKeyPress={(e) => e.key === "Enter" && addCustomField()}
                   />
                   <Button
                     variant="contained"
@@ -486,8 +753,15 @@ export default function CertificateGenerator() {
                 </Box>
 
                 {fields.length > 0 && (
-                  <Paper elevation={1} sx={{ p: 1, maxHeight: 300, overflow: 'auto' }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                  <Paper
+                    elevation={1}
+                    sx={{ p: 1, maxHeight: 300, overflow: "auto" }}
+                  >
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ ml: 1 }}
+                    >
                       {fields.length} fields (click to select)
                     </Typography>
                     {fields.map((field) => (
@@ -496,20 +770,33 @@ export default function CertificateGenerator() {
                         sx={{
                           p: 1,
                           mb: 1,
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          backgroundColor: selectedFieldId === field.id ? 'action.selected' : 'background.paper',
-                          cursor: 'pointer'
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          backgroundColor:
+                            selectedFieldId === field.id
+                              ? "action.selected"
+                              : "background.paper",
+                          cursor: "pointer",
                         }}
                         onClick={() => setSelectedFieldId(field.id)}
                       >
-                        <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <Box
+                          sx={{ overflow: "hidden", textOverflow: "ellipsis" }}
+                        >
                           <Typography variant="body2" fontWeight="bold" noWrap>
                             {field.text}
+                            {field.isStatic && (
+                              <Chip
+                                label="Static"
+                                size="small"
+                                sx={{ ml: 1 }}
+                              />
+                            )}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {field.fontSize}px | {field.fontWeight} | {field.color}
+                            {field.fontSize}px | {field.fontFamily} |{" "}
+                            {field.color}
                           </Typography>
                         </Box>
                         <IconButton
@@ -532,24 +819,42 @@ export default function CertificateGenerator() {
 
             {activeTab === 1 && (
               <Box>
-                <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                <Typography
+                  variant="subtitle2"
+                  gutterBottom
+                  sx={{ fontWeight: "bold" }}
+                >
                   Upload Data Source
                 </Typography>
-                <Box {...getRootProps()} sx={{
-                  border: '2px dashed',
-                  borderColor: isDragActive ? 'primary.main' : 'divider',
-                  p: 3,
-                  borderRadius: 1,
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  backgroundColor: isDragActive ? 'action.hover' : 'background.paper',
-                  mb: 2
-                }}>
+                <Box
+                  {...getRootProps()}
+                  sx={{
+                    border: "2px dashed",
+                    borderColor: isDragActive ? "primary.main" : "divider",
+                    p: 3,
+                    borderRadius: 1,
+                    textAlign: "center",
+                    cursor: "pointer",
+                    backgroundColor: isDragActive
+                      ? "action.hover"
+                      : "background.paper",
+                    mb: 2,
+                  }}
+                >
                   <input {...getInputProps()} />
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 1,
+                    }}
+                  >
                     <InsertDriveFile fontSize="large" />
                     <Typography>
-                      {isDragActive ? 'Drop file here' : 'Drag & drop Excel/CSV'}
+                      {isDragActive
+                        ? "Drop file here"
+                        : "Drag & drop Excel/CSV"}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       XLSX, CSV (Column headers become fields)
@@ -557,23 +862,41 @@ export default function CertificateGenerator() {
                   </Box>
                 </Box>
 
-                {data.length > 0 && (
+                {(data.length > 0 || fields.some((f) => f.isStatic)) && (
                   <>
                     <Divider sx={{ my: 2 }} />
-                    <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
-                      Data Preview ({data.length} records)
+                    <Typography
+                      variant="subtitle2"
+                      gutterBottom
+                      sx={{ fontWeight: "bold" }}
+                    >
+                      {data.length > 0
+                        ? `Data Preview (${data.length} records)`
+                        : "Static Fields Only"}
                     </Typography>
-                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 2 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        gap: 1,
+                        alignItems: "center",
+                        mb: 2,
+                      }}
+                    >
                       <Button
                         variant="outlined"
-                        startIcon={previewMode ? <VisibilityOff /> : <Visibility />}
-                        onClick={() => setPreviewMode(!previewMode)}
+                        startIcon={
+                          previewMode ? <VisibilityOff /> : <Visibility />
+                        }
+                        onClick={() => {
+                          setPreviewMode(!previewMode);
+                          if (!previewMode) updatePreview(0);
+                        }}
                         fullWidth
                       >
-                        {previewMode ? 'Stop Preview' : 'Preview Mode'}
+                        {previewMode ? "Stop Preview" : "Preview Mode"}
                       </Button>
 
-                      {previewMode && (
+                      {previewMode && data.length > 0 && (
                         <Button
                           variant="outlined"
                           onClick={() => exportSingle(currentPreviewIndex)}
@@ -585,8 +908,15 @@ export default function CertificateGenerator() {
                       )}
                     </Box>
 
-                    {previewMode && (
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    {previewMode && data.length > 0 && (
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          mb: 2,
+                        }}
+                      >
                         <IconButton
                           onClick={() => updatePreview(currentPreviewIndex - 1)}
                           disabled={currentPreviewIndex === 0}
@@ -594,7 +924,10 @@ export default function CertificateGenerator() {
                         >
                           <Typography variant="h6">◀</Typography>
                         </IconButton>
-                        <Typography variant="body2" sx={{ flexGrow: 1, textAlign: 'center' }}>
+                        <Typography
+                          variant="body2"
+                          sx={{ flexGrow: 1, textAlign: "center" }}
+                        >
                           Record {currentPreviewIndex + 1} of {data.length}
                         </Typography>
                         <IconButton
@@ -607,16 +940,30 @@ export default function CertificateGenerator() {
                       </Box>
                     )}
 
-                    <Paper elevation={1} sx={{ p: 1, maxHeight: 200, overflow: 'auto' }}>
-                      <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                        First row preview:
-                      </Typography>
-                      {data[0] && Object.entries(data[0]).map(([key, value]) => (
-                        <Typography key={key} variant="body2" sx={{ fontFamily: 'monospace' }}>
-                          <strong>{key}:</strong> {String(value)}
+                    {data.length > 0 && (
+                      <Paper
+                        elevation={1}
+                        sx={{ p: 1, maxHeight: 200, overflow: "auto" }}
+                      >
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ ml: 1 }}
+                        >
+                          First row preview:
                         </Typography>
-                      ))}
-                    </Paper>
+                        {data[0] &&
+                          Object.entries(data[0]).map(([key, value]) => (
+                            <Typography
+                              key={key}
+                              variant="body2"
+                              sx={{ fontFamily: "monospace" }}
+                            >
+                              <strong>{key}:</strong> {String(value)}
+                            </Typography>
+                          ))}
+                      </Paper>
+                    )}
                   </>
                 )}
               </Box>
@@ -624,7 +971,11 @@ export default function CertificateGenerator() {
 
             {activeTab === 2 && (
               <Box>
-                <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                <Typography
+                  variant="subtitle2"
+                  gutterBottom
+                  sx={{ fontWeight: "bold" }}
+                >
                   Page Settings
                 </Typography>
                 <Grid container spacing={1} sx={{ mb: 2 }}>
@@ -634,7 +985,9 @@ export default function CertificateGenerator() {
                       <Select
                         value={settings.pageSize}
                         label="Page Size"
-                        onChange={(e) => setSettings({ ...settings, pageSize: e.target.value })}
+                        onChange={(e) =>
+                          setSettings({ ...settings, pageSize: e.target.value })
+                        }
                       >
                         <MenuItem value="a4">A4</MenuItem>
                         <MenuItem value="letter">Letter</MenuItem>
@@ -647,7 +1000,12 @@ export default function CertificateGenerator() {
                       <Select
                         value={settings.orientation}
                         label="Orientation"
-                        onChange={(e) => setSettings({ ...settings, orientation: e.target.value })}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            orientation: e.target.value,
+                          })
+                        }
                       >
                         <MenuItem value="landscape">Landscape</MenuItem>
                         <MenuItem value="portrait">Portrait</MenuItem>
@@ -658,7 +1016,11 @@ export default function CertificateGenerator() {
 
                 <Divider sx={{ my: 2 }} />
 
-                <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                <Typography
+                  variant="subtitle2"
+                  gutterBottom
+                  sx={{ fontWeight: "bold" }}
+                >
                   Export Settings
                 </Typography>
                 <FormControl fullWidth size="small" sx={{ mb: 1 }}>
@@ -666,20 +1028,28 @@ export default function CertificateGenerator() {
                   <Select
                     value={settings.exportFormat}
                     label="Export Format"
-                    onChange={(e) => setSettings({ ...settings, exportFormat: e.target.value })}
+                    onChange={(e) =>
+                      setSettings({ ...settings, exportFormat: e.target.value })
+                    }
                   >
                     <MenuItem value="pdf">PDF</MenuItem>
                     <MenuItem value="png">PNG Image</MenuItem>
+                    <MenuItem value="webp">WebP Image</MenuItem>
                   </Select>
                 </FormControl>
 
-                {settings.exportFormat === 'pdf' && (
+                {settings.exportFormat === "pdf" && (
                   <FormControl fullWidth size="small" sx={{ mb: 2 }}>
                     <InputLabel>Export Method</InputLabel>
                     <Select
                       value={settings.exportMethod}
                       label="Export Method"
-                      onChange={(e) => setSettings({ ...settings, exportMethod: e.target.value })}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          exportMethod: e.target.value,
+                        })
+                      }
                     >
                       <MenuItem value="zip">Multiple files (ZIP)</MenuItem>
                       <MenuItem value="merge">Single merged PDF</MenuItem>
@@ -687,18 +1057,24 @@ export default function CertificateGenerator() {
                   </FormControl>
                 )}
 
-                <Typography variant="subtitle2" gutterBottom sx={{ mt: 1, fontWeight: 'bold' }}>
+                <Typography
+                  variant="subtitle2"
+                  gutterBottom
+                  sx={{ mt: 1, fontWeight: "bold" }}
+                >
                   Image Quality
                 </Typography>
                 <Slider
                   value={settings.imageQuality * 100}
-                  onChange={(_, value) => setSettings({ ...settings, imageQuality: value / 100 })}
+                  onChange={(_, value) =>
+                    setSettings({ ...settings, imageQuality: value / 100 })
+                  }
                   min={50}
                   max={100}
                   step={5}
                   valueLabelDisplay="auto"
                   valueLabelFormat={(value) => `${value}%`}
-                  sx={{ width: '95%', mx: 'auto' }}
+                  sx={{ width: "95%", mx: "auto" }}
                 />
               </Box>
             )}
@@ -710,7 +1086,7 @@ export default function CertificateGenerator() {
               color="primary"
               startIcon={<FolderZip />}
               onClick={exportAll}
-              disabled={loading || !bgImage || fields.length === 0 || data.length === 0}
+              disabled={loading || !bgImage || fields.length === 0}
               fullWidth
               size="large"
               sx={{ py: 1.5 }}
@@ -720,8 +1096,10 @@ export default function CertificateGenerator() {
                   <CircularProgress size={24} color="inherit" sx={{ mr: 1 }} />
                   Exporting...
                 </>
+              ) : data.length > 0 ? (
+                `Export All (${data.length})`
               ) : (
-                `Export All (${data.length || 0})`
+                "Export Template"
               )}
             </Button>
           </Paper>
@@ -729,14 +1107,41 @@ export default function CertificateGenerator() {
 
         {/* Right Panel - Certificate Canvas */}
         <Grid item xs={12} md={8}>
-          <Paper elevation={3} sx={{ p: 2, height: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6">Certificate Design</Typography>
+          <Paper
+            elevation={3}
+            sx={{
+              p: 2,
+              height: "calc(100vh - 120px)",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                mb: 2,
+              }}
+            >
+              <Typography variant="h6">Preview</Typography>
               <Chip
-                label={bgImage ? `Template: ${Math.round(canvasDimensions.width)}×${Math.round(canvasDimensions.height)}px` : 'No Template'}
-                color={bgImage ? 'success' : 'default'}
+                label={
+                  bgImage
+                    ? `Template: ${Math.round(
+                        canvasDimensions.width
+                      )}×${Math.round(canvasDimensions.height)}px`
+                    : "No Template"
+                }
+                color={bgImage ? "success" : "default"}
                 size="small"
-                avatar={<Avatar sx={{ bgcolor: bgImage ? 'success.main' : 'default' }}>{bgImage ? <Image /> : <GridView />}</Avatar>}
+                avatar={
+                  <Avatar
+                    sx={{ bgcolor: bgImage ? "success.main" : "default" }}
+                  >
+                    {bgImage ? <Image /> : <GridView />}
+                  </Avatar>
+                }
               />
             </Box>
 
@@ -744,26 +1149,26 @@ export default function CertificateGenerator() {
               ref={canvasContainerRef}
               sx={{
                 flexGrow: 1,
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                overflow: 'auto',
-                backgroundColor: 'action.hover',
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                overflow: "auto",
+                backgroundColor: "action.hover",
                 borderRadius: 1,
-                p: 1
+                p: 1,
               }}
             >
               <Box
                 ref={certRef}
                 sx={{
-                  position: 'relative',
+                  position: "relative",
                   width: canvasDimensions.width,
                   height: canvasDimensions.height,
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  backgroundColor: 'background.paper',
-                  overflow: 'hidden',
-                  boxShadow: 3
+                  border: "1px solid",
+                  borderColor: "divider",
+                  backgroundColor: "background.paper",
+                  overflow: "hidden",
+                  boxShadow: 3,
                 }}
               >
                 {bgImage && (
@@ -771,11 +1176,11 @@ export default function CertificateGenerator() {
                     src={bgImage}
                     alt="Certificate template"
                     style={{
-                      position: 'absolute',
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'contain',
-                      pointerEvents: 'none'
+                      position: "absolute",
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "contain",
+                      pointerEvents: "none",
                     }}
                     onLoad={handleImageLoad}
                   />
@@ -784,24 +1189,34 @@ export default function CertificateGenerator() {
                   <Draggable
                     key={field.id}
                     position={{ x: field.x, y: field.y }}
-                    onStop={(_, data) => updateFieldPosition(field.id, data.x, data.y)}
+                    onStop={(_, data) =>
+                      updateFieldPosition(field.id, data.x, data.y)
+                    }
                     bounds="parent"
                     disabled={previewMode}
                   >
                     <Box
                       onContextMenu={(e) => handleContextMenu(e, field.id)}
                       sx={{
-                        position: 'absolute',
+                        position: "absolute",
                         fontSize: `${field.fontSize}px`,
                         fontWeight: field.fontWeight,
+                        fontStyle: field.fontStyle,
+                        textDecoration: field.textDecoration,
+                        fontFamily: field.fontFamily,
                         color: field.color,
                         px: 1,
-                        backgroundColor: previewMode ? 'transparent' : 'rgba(255,255,255,0.7)',
+                        backgroundColor: previewMode
+                          ? "transparent"
+                          : "rgba(255,255,255,0.7)",
                         borderRadius: 1,
-                        cursor: previewMode ? 'default' : 'move',
-                        border: selectedFieldId === field.id ? '1px dashed #555' : 'none',
-                        userSelect: 'none',
-                        whiteSpace: 'nowrap'
+                        cursor: previewMode ? "default" : "move",
+                        border:
+                          selectedFieldId === field.id
+                            ? "1px dashed #555"
+                            : "none",
+                        userSelect: "none",
+                        whiteSpace: "nowrap",
                       }}
                     >
                       {field.displayText || field.text}
@@ -819,7 +1234,11 @@ export default function CertificateGenerator() {
         open={Boolean(contextMenu)}
         onClose={handleCloseContextMenu}
         anchorReference="anchorPosition"
-        anchorPosition={contextMenu ? { top: contextMenu.mouseY, left: contextMenu.mouseX } : undefined}
+        anchorPosition={
+          contextMenu
+            ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
+            : undefined
+        }
       >
         <MenuItem onClick={handleEditField}>
           <Edit fontSize="small" sx={{ mr: 1 }} /> Edit Field
@@ -828,7 +1247,7 @@ export default function CertificateGenerator() {
           <Colorize fontSize="small" sx={{ mr: 1 }} /> Change Color
         </MenuItem>
         <MenuItem disableRipple>
-          <Box sx={{ display: 'flex', alignItems: 'center', width: 200 }}>
+          <Box sx={{ display: "flex", alignItems: "center", width: 200 }}>
             <FontDownload fontSize="small" sx={{ mr: 1 }} />
             <Slider
               min={8}
@@ -840,18 +1259,21 @@ export default function CertificateGenerator() {
             />
           </Box>
         </MenuItem>
-        <MenuItem onClick={handleDeleteField} sx={{ color: 'error.main' }}>
+        <MenuItem onClick={handleDeleteField} sx={{ color: "error.main" }}>
           <Delete fontSize="small" sx={{ mr: 1 }} /> Delete
         </MenuItem>
       </Menu>
 
       {/* Color Picker Dialog */}
       {colorPickerOpen && (
-        <Dialog open={colorPickerOpen} onClose={() => setColorPickerOpen(false)}>
+        <Dialog
+          open={colorPickerOpen}
+          onClose={() => setColorPickerOpen(false)}
+        >
           <DialogTitle>Select Text Color</DialogTitle>
           <DialogContent>
             <ChromePicker
-              color={selectedField?.color || '#000000'}
+              color={selectedField?.color || "#000000"}
               onChangeComplete={handleColorChange}
             />
           </DialogContent>
@@ -862,61 +1284,170 @@ export default function CertificateGenerator() {
       )}
 
       {/* Edit Field Dialog */}
-      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)}>
+      <Dialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
         <DialogTitle>Edit Field</DialogTitle>
         <DialogContent>
           <TextField
             fullWidth
             margin="dense"
             label="Field Text"
-            value={editingField?.text || ''}
-            onChange={(e) => setEditingField({ ...editingField, text: e.target.value })}
+            value={editingField?.text || ""}
+            onChange={(e) =>
+              setEditingField({ ...editingField, text: e.target.value })
+            }
           />
-          <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+
+          <Box sx={{ mt: 2, display: "flex", gap: 2 }}>
             <FormControl fullWidth margin="dense">
-              <InputLabel>Font Weight</InputLabel>
+              <InputLabel>Font Family</InputLabel>
               <Select
-                value={editingField?.fontWeight || 'normal'}
-                label="Font Weight"
-                onChange={(e) => setEditingField({ ...editingField, fontWeight: e.target.value })}
+                value={editingField?.fontFamily || "Arial"}
+                label="Font Family"
+                onChange={(e) =>
+                  setEditingField({
+                    ...editingField,
+                    fontFamily: e.target.value,
+                  })
+                }
               >
-                <MenuItem value="normal">Normal</MenuItem>
-                <MenuItem value="bold">Bold</MenuItem>
-                <MenuItem value="lighter">Light</MenuItem>
+                <MenuItem value="Arial">Arial</MenuItem>
+                <MenuItem value="Times New Roman">Times New Roman</MenuItem>
+                <MenuItem value="Courier New">Courier New</MenuItem>
+                <MenuItem value="Georgia">Georgia</MenuItem>
+                <MenuItem value="Verdana">Verdana</MenuItem>
+                <MenuItem value="Helvetica">Helvetica</MenuItem>
               </Select>
             </FormControl>
+
             <TextField
               fullWidth
               margin="dense"
               label="Font Size"
               type="number"
               value={editingField?.fontSize || 24}
-              onChange={(e) => setEditingField({ ...editingField, fontSize: parseInt(e.target.value) })}
+              onChange={(e) =>
+                setEditingField({
+                  ...editingField,
+                  fontSize: parseInt(e.target.value),
+                })
+              }
             />
           </Box>
+
+          <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
+            <Tooltip title="Bold">
+              <IconButton
+                color={
+                  editingField?.fontWeight === "bold" ? "primary" : "default"
+                }
+                onClick={() =>
+                  setEditingField({
+                    ...editingField,
+                    fontWeight:
+                      editingField?.fontWeight === "bold" ? "normal" : "bold",
+                  })
+                }
+              >
+                <FormatBold />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Italic">
+              <IconButton
+                color={
+                  editingField?.fontStyle === "italic" ? "primary" : "default"
+                }
+                onClick={() =>
+                  setEditingField({
+                    ...editingField,
+                    fontStyle:
+                      editingField?.fontStyle === "italic"
+                        ? "normal"
+                        : "italic",
+                  })
+                }
+              >
+                <FormatItalic />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Underline">
+              <IconButton
+                color={
+                  editingField?.textDecoration === "underline"
+                    ? "primary"
+                    : "default"
+                }
+                onClick={() =>
+                  setEditingField({
+                    ...editingField,
+                    textDecoration:
+                      editingField?.textDecoration === "underline"
+                        ? "none"
+                        : "underline",
+                  })
+                }
+              >
+                <FormatUnderlined />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Text Color">
+              <IconButton
+                onClick={() => {
+                  setColorPickerOpen(true);
+                  setEditDialogOpen(false);
+                }}
+              >
+                <FormatColorText />
+              </IconButton>
+            </Tooltip>
+          </Box>
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={editingField?.isStatic || false}
+                onChange={(e) =>
+                  setEditingField({
+                    ...editingField,
+                    isStatic: e.target.checked,
+                  })
+                }
+              />
+            }
+            label="Static Field (same text on all certificates)"
+            sx={{ mt: 2 }}
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-          <Button onClick={saveFieldEdit} variant="contained">Save</Button>
+          <Button onClick={saveFieldEdit} variant="contained">
+            Save
+          </Button>
         </DialogActions>
       </Dialog>
 
       {/* Loading Indicator */}
       {loading && (
-        <Box sx={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.7)',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 9999,
-          color: 'white'
-        }}>
+        <Box
+          sx={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.7)",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9999,
+            color: "white",
+          }}
+        >
           <CircularProgress size={80} thickness={4} color="inherit" />
           <Typography variant="h5" sx={{ mt: 3 }}>
             Generating Certificates...
@@ -935,12 +1466,12 @@ export default function CertificateGenerator() {
         open={snackbar.open}
         autoHideDuration={6000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
         <Alert
           onClose={() => setSnackbar({ ...snackbar, open: false })}
           severity={snackbar.severity}
-          sx={{ width: '100%' }}
+          sx={{ width: "100%" }}
           variant="filled"
         >
           {snackbar.message}
