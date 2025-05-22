@@ -26,6 +26,7 @@
     "react-dropzone": "^14.3.8",
     "react-scripts": "5.0.1",
     "react-signature-canvas": "^1.1.0-alpha.2",
+    "webfontloader": "^1.6.28",
     "xlsx": "^0.18.5"
   },
   "scripts": {

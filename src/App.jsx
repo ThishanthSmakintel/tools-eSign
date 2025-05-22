@@ -17,20 +17,19 @@ import {
   TextField,
   Tooltip,
 } from "@mui/material";
-import {
-  FolderZip,
-  FormatAlignLeft,
-  FormatAlignCenter,
-  FormatAlignRight,
-  FormatAlignJustify,
-  CropFree,
-  TextFields,
-} from "@mui/icons-material";
+import { FolderZip, TextFields, CropFree } from "@mui/icons-material";
 
-// Font options (limited for browser-safe fonts)
-const FONT_FAMILIES = ["Arial", "Verdana", "Times New Roman", "Georgia", "Courier New", "Tahoma"];
+const FONT_FAMILIES = [
+  "Arial",
+  "Verdana",
+  "Times New Roman",
+  "Georgia",
+  "Courier New",
+  "Tahoma",
+];
 
 export default function CertificateEditor() {
+  const containerRef = useRef(null);
   const canvasRef = useRef(null);
   const [canvas, setCanvas] = useState(null);
   const [columns, setColumns] = useState([]);
@@ -43,64 +42,83 @@ export default function CertificateEditor() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
+  // Setup Fabric canvas and handle resizing
   useEffect(() => {
-    const fabricCanvas = new fabric.Canvas("certificateCanvas", {
+    if (!canvasRef.current || !containerRef.current) return;
+
+    const fabricCanvas = new fabric.Canvas(canvasRef.current, {
       preserveObjectStacking: true,
       backgroundColor: "#fff",
+      selection: true,
     });
-    fabricCanvas.setHeight(600);
-    fabricCanvas.setWidth(1000);
+
     setCanvas(fabricCanvas);
+
+    // Resize canvas function to keep 1000x600 aspect ratio
+    const resizeCanvas = () => {
+      if (!containerRef.current) return;
+
+      const containerWidth = containerRef.current.clientWidth;
+      const calculatedHeight = (containerWidth * 600) / 1000;
+
+      fabricCanvas.setWidth(containerWidth);
+      fabricCanvas.setHeight(calculatedHeight);
+
+      if (backgroundRef.current) {
+        const img = backgroundRef.current;
+        img.scaleToWidth(containerWidth);
+        img.scaleToHeight(calculatedHeight);
+      }
+
+      fabricCanvas.calcOffset();
+      fabricCanvas.renderAll();
+    };
+
+    resizeCanvas();
+
+    const resizeObserver = new ResizeObserver(resizeCanvas);
+    resizeObserver.observe(containerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+      fabricCanvas.dispose();
+      setCanvas(null);
+    };
   }, []);
 
-  const onDrop = (acceptedFiles) => {
-    const file = acceptedFiles[0];
-    if (!file || !canvas) return;
-
-    const reader = new FileReader();
-
-    if (file.type.includes("image")) {
-      reader.onload = (f) => {
-        fabric.Image.fromURL(f.target.result, (img) => {
-          const scaleX = canvas.width / img.width;
-          const scaleY = canvas.height / img.height;
-          img.set({ scaleX, scaleY, selectable: false, evented: false });
-          canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
-          backgroundRef.current = img;
-        });
-      };
-      reader.readAsDataURL(file);
-    } else if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
-      reader.onload = (evt) => {
-        const wb = XLSX.read(evt.target.result, { type: "binary" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(ws);
-        if (jsonData.length > 0) {
-          setColumns(Object.keys(jsonData[0]));
-          setDataRows(jsonData);
-        }
-      };
-      reader.readAsBinaryString(file);
-    }
+  // Delete control icon rendering
+  const renderDeleteIcon = (ctx, left, top) => {
+    ctx.save();
+  
+    const radius = 10;
+  
+    // Draw circular red button
+    ctx.beginPath();
+    ctx.arc(left, top, radius, 0, 2 * Math.PI, false);
+    ctx.fillStyle = "#f44336"; // MUI red
+    ctx.fill();
+  
+    // Draw white "X"
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+  
+    ctx.beginPath();
+    ctx.moveTo(left - 4, top - 4);
+    ctx.lineTo(left + 4, top + 4);
+    ctx.moveTo(left + 4, top - 4);
+    ctx.lineTo(left - 4, top + 4);
+    ctx.stroke();
+  
+    ctx.restore();
   };
-
-  const { getRootProps, getInputProps } = useDropzone({ onDrop });
+  
 
   const deleteObject = (_eventData, transform) => {
-    const canvas = transform.target.canvas;
-    canvas.remove(transform.target);
+    const target = transform.target;
+    const canvas = target.canvas;
+    canvas.remove(target);
     canvas.requestRenderAll();
-  };
-
-  const renderDeleteIcon = (ctx, left, top) => {
-    const img = new Image();
-    const svg = encodeURIComponent(
-      `<svg xmlns="http://www.w3.org/2000/svg" height="24" width="24" fill="red"><path d="M18.3 5.71 12 12l6.3 6.29-1.42 1.42L10.59 13.4l-6.3 6.3-1.42-1.42L9.17 12 2.88 5.71 4.3 4.29 10.59 10.6l6.3-6.3z"/></svg>`
-    );
-    img.src = `data:image/svg+xml,${svg}`;
-    ctx.save();
-    ctx.drawImage(img, left - 12, top - 12, 24, 24);
-    ctx.restore();
   };
 
   const addDeleteControlToObject = (obj) => {
@@ -112,10 +130,11 @@ export default function CertificateEditor() {
       cursorStyle: "pointer",
       mouseUpHandler: deleteObject,
       render: renderDeleteIcon,
-      cornerSize: 24,
+      cornerSize: 20,
     });
   };
 
+  // Add a textbox — static or dynamic based on Excel column
   const addTextbox = (text, isDynamic = false, columnKey = null) => {
     if (!canvas) return;
 
@@ -128,6 +147,8 @@ export default function CertificateEditor() {
       fill: "#000",
       textAlign: alignment,
       columnKey: isDynamic ? columnKey : undefined,
+      editable: true,
+      cursorWidth: 2,
     });
 
     addDeleteControlToObject(textbox);
@@ -136,45 +157,99 @@ export default function CertificateEditor() {
     canvas.requestRenderAll();
   };
 
+  // File drop handler
+  const onDrop = (acceptedFiles) => {
+    const file = acceptedFiles[0];
+    if (!file || !canvas) return;
+
+    const reader = new FileReader();
+
+    if (file.type.includes("image")) {
+      reader.onload = (f) => {
+        fabric.Image.fromURL(f.target.result, (img) => {
+          // Scale image to fit canvas dimensions
+          const scaleX = canvas.width / img.width;
+          const scaleY = canvas.height / img.height;
+          img.set({ scaleX, scaleY, selectable: false, evented: false });
+          canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+          backgroundRef.current = img;
+        });
+      };
+      reader.readAsDataURL(file);
+    } else if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+      reader.onload = (evt) => {
+        try {
+          const wb = XLSX.read(evt.target.result, { type: "binary" });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json(ws);
+
+          if (jsonData.length === 0) {
+            setColumns([]);
+            setDataRows([]);
+            alert("Excel sheet is empty.");
+            return;
+          }
+
+          setColumns(Object.keys(jsonData[0]));
+          setDataRows(jsonData);
+        } catch (error) {
+          alert("Failed to read Excel file.");
+          setColumns([]);
+          setDataRows([]);
+        }
+      };
+      reader.readAsBinaryString(file);
+    }
+  };
+
+  const { getRootProps, getInputProps } = useDropzone({ onDrop });
+
+  // Export all certificates as a ZIP of PNGs
   const handleExport = async () => {
+    if (!canvas || dataRows.length === 0) {
+      alert("No data to export.");
+      return;
+    }
+
     const zip = new JSZip();
+
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i];
+
       canvas.getObjects("textbox").forEach((obj) => {
         const key = obj.columnKey;
         if (key && row[key] !== undefined) {
           obj.set("text", String(row[key]));
         }
       });
+
       canvas.renderAll();
+
+      await new Promise((r) => setTimeout(r, 50));
+
       const dataUrl = canvas.toDataURL({ format: "png" });
       const blob = await (await fetch(dataUrl)).blob();
       zip.file(`certificate_${i + 1}.png`, blob);
     }
+
     const content = await zip.generateAsync({ type: "blob" });
     saveAs(content, "certificates.zip");
   };
 
-  const updateActiveObjectStyle = () => {
-    const obj = canvas?.getActiveObject();
+  // Update selected textbox style on font/alignment change
+  useEffect(() => {
+    if (!canvas) return;
+    const obj = canvas.getActiveObject();
     if (obj && obj.type === "textbox") {
-      obj.set({
-        fontSize,
-        fontFamily,
-        textAlign: alignment,
-      });
+      obj.set({ fontSize, fontFamily, textAlign: alignment });
       canvas.requestRenderAll();
     }
-  };
-
-  useEffect(() => {
-    updateActiveObjectStyle();
-  }, [fontSize, fontFamily, alignment]);
+  }, [fontSize, fontFamily, alignment, canvas]);
 
   return (
     <Box sx={{ p: 3, maxWidth: 1200, mx: "auto" }}>
       <Typography variant="h4" fontWeight={600} gutterBottom>
-        🎓 Certificate Editor
+      Certificate Editor
       </Typography>
 
       <Box
@@ -188,10 +263,11 @@ export default function CertificateEditor() {
           bgcolor: "#e3f2fd",
           cursor: "pointer",
           "&:hover": { bgcolor: "#bbdefb" },
+          userSelect: "none",
         }}
       >
         <input {...getInputProps()} />
-        <Typography variant="body1" color="text.secondary">
+        <Typography variant="body1" color="text.secondary" sx={{ userSelect: "none" }}>
           Drop background image or Excel file here, or click to browse
         </Typography>
       </Box>
@@ -221,7 +297,15 @@ export default function CertificateEditor() {
         ))}
       </Box>
 
-      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mb: 3 }}>
+      <Box
+        sx={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 2,
+          mb: 3,
+          alignItems: "center",
+        }}
+      >
         <FormControl sx={{ minWidth: 160 }}>
           <InputLabel>Text Align</InputLabel>
           <Select
@@ -254,8 +338,12 @@ export default function CertificateEditor() {
         <TextField
           label="Font Size"
           type="number"
+          inputProps={{ min: 8, max: 72 }}
           value={fontSize}
-          onChange={(e) => setFontSize(Number(e.target.value))}
+          onChange={(e) => {
+            const val = Number(e.target.value);
+            if (val >= 8 && val <= 72) setFontSize(val);
+          }}
           sx={{ width: 120 }}
         />
 
@@ -263,17 +351,33 @@ export default function CertificateEditor() {
           variant="contained"
           startIcon={<FolderZip />}
           onClick={handleExport}
+          disabled={dataRows.length === 0}
           fullWidth={isMobile}
+          sx={{ minWidth: 160 }}
         >
           Export as ZIP
         </Button>
       </Box>
 
-      <Box sx={{ mt: 3, overflowX: "auto", border: "1px solid #ccc", borderRadius: 2 }}>
+      {/* Container with fixed aspect ratio holding the canvas */}
+      <Box
+        ref={containerRef}
+        sx={{
+          mt: 3,
+          width: "100%",
+          maxWidth: 1000,
+          border: "1px solid #ccc",
+          borderRadius: 2,
+          backgroundColor: "#fff",
+          p: 1,
+          aspectRatio: "1000 / 600",
+          overflow: "hidden",
+        }}
+      >
         <canvas
           id="certificateCanvas"
           ref={canvasRef}
-          style={{ width: "100%", maxWidth: 1000 }}
+          style={{ display: "block", width: "100%", height: "100%" }}
         />
       </Box>
     </Box>
