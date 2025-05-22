@@ -39,16 +39,14 @@ export default function CertificateEditor() {
   const [alignment, setAlignment] = useState("center");
   const [fontSize, setFontSize] = useState(24);
   const [fontFamily, setFontFamily] = useState("Arial");
-  const backgroundRef = useRef(null);
-
-  const [backgroundLoaded, setBackgroundLoaded] = useState(false); // NEW state
+  const [backgroundLoaded, setBackgroundLoaded] = useState(false);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
-  // Snackbar state for user feedback
   const [alert, setAlert] = useState({ open: false, message: "", severity: "info" });
 
+  // Initialize Fabric canvas
   useEffect(() => {
     if (!canvasRef.current || !containerRef.current) return;
 
@@ -60,27 +58,28 @@ export default function CertificateEditor() {
 
     setCanvas(fabricCanvas);
 
+    // Responsive canvas size
     const resizeCanvas = () => {
       if (!containerRef.current) return;
 
       const containerWidth = containerRef.current.clientWidth;
+      // Maintain aspect ratio 1000:600
       const calculatedHeight = (containerWidth * 600) / 1000;
 
       fabricCanvas.setWidth(containerWidth);
       fabricCanvas.setHeight(calculatedHeight);
 
-      if (backgroundRef.current) {
-        const img = backgroundRef.current;
-        img.scaleToWidth(containerWidth);
-        img.scaleToHeight(calculatedHeight);
+      // Re-center background image if present
+      if (fabricCanvas.backgroundImage) {
+        centerBackgroundImage(fabricCanvas);
       }
 
       fabricCanvas.calcOffset();
-      fabricCanvas.renderAll();
+      fabricCanvas.requestRenderAll();
     };
 
+    // Resize initially and on container resize
     resizeCanvas();
-
     const resizeObserver = new ResizeObserver(resizeCanvas);
     resizeObserver.observe(containerRef.current);
 
@@ -91,6 +90,43 @@ export default function CertificateEditor() {
     };
   }, []);
 
+  // Function to center background image on canvas without stretching
+  const centerBackgroundImage = (fabricCanvas) => {
+    const img = fabricCanvas.backgroundImage;
+    if (!img) return;
+
+    const canvasWidth = fabricCanvas.getWidth();
+    const canvasHeight = fabricCanvas.getHeight();
+
+    // Reset any scaling first
+    img.scaleX = 1;
+    img.scaleY = 1;
+
+    const imgRatio = img.width / img.height;
+    const canvasRatio = canvasWidth / canvasHeight;
+
+    let scaleFactor;
+
+    if (imgRatio > canvasRatio) {
+      // Image is wider than canvas ratio - fit width
+      scaleFactor = canvasWidth / img.width;
+    } else {
+      // Image is taller - fit height
+      scaleFactor = canvasHeight / img.height;
+    }
+
+    img.scale(scaleFactor);
+
+    // Center image
+    img.left = (canvasWidth - img.getScaledWidth()) / 2;
+    img.top = (canvasHeight - img.getScaledHeight()) / 2;
+
+    img.setCoords();
+
+    fabricCanvas.requestRenderAll();
+  };
+
+  // Render delete control icon on fabric objects
   const renderDeleteIcon = (ctx, left, top) => {
     ctx.save();
     const radius = 10;
@@ -110,6 +146,7 @@ export default function CertificateEditor() {
     ctx.restore();
   };
 
+  // Delete control mouse handler
   const deleteObject = (_eventData, transform) => {
     const target = transform.target;
     const canvasInstance = target.canvas;
@@ -117,6 +154,7 @@ export default function CertificateEditor() {
     canvasInstance.requestRenderAll();
   };
 
+  // Add delete control to fabric object
   const addDeleteControlToObject = (obj) => {
     obj.controls.deleteControl = new fabric.Control({
       x: 0.5,
@@ -130,7 +168,7 @@ export default function CertificateEditor() {
     });
   };
 
-  // Add textbox with validation to prevent adding if no background or dataRows loaded
+  // Add textbox with validation and default centered position
   const addTextbox = (text, isDynamic = false, columnKey = null) => {
     if (dataRows.length === 0 && !backgroundLoaded) {
       setAlert({
@@ -142,10 +180,15 @@ export default function CertificateEditor() {
     }
     if (!canvas) return;
 
+    // Position textbox centered horizontally, 1/3 vertically
+    const canvasWidth = canvas.getWidth();
+    const canvasHeight = canvas.getHeight();
+    const textboxWidth = 300;
+
     const textbox = new fabric.Textbox(text, {
-      left: 100,
-      top: 100,
-      width: 300,
+      left: (canvasWidth - textboxWidth) / 2,
+      top: canvasHeight / 3,
+      width: textboxWidth,
       fontSize,
       fontFamily,
       fill: "#000",
@@ -161,6 +204,7 @@ export default function CertificateEditor() {
     canvas.requestRenderAll();
   };
 
+  // Handle files dropped (image or Excel)
   const onDrop = (acceptedFiles) => {
     const file = acceptedFiles[0];
     if (!file || !canvas) return;
@@ -170,12 +214,16 @@ export default function CertificateEditor() {
     if (file.type.includes("image")) {
       reader.onload = (f) => {
         fabric.Image.fromURL(f.target.result, (img) => {
-          const scaleX = canvas.width / img.width;
-          const scaleY = canvas.height / img.height;
-          img.set({ scaleX, scaleY, selectable: false, evented: false });
-          canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
-          backgroundRef.current = img;
-          setBackgroundLoaded(true); // Set backgroundLoaded true here
+          const canvasWidth = canvas.getWidth();
+          const canvasHeight = canvas.getHeight();
+
+          // Set no stretch, center image
+          img.set({ selectable: false, evented: false });
+
+          canvas.setBackgroundImage(img, () => {
+            centerBackgroundImage(canvas);
+          });
+          setBackgroundLoaded(true);
         });
       };
       reader.readAsDataURL(file);
@@ -208,6 +256,7 @@ export default function CertificateEditor() {
 
   const { getRootProps, getInputProps } = useDropzone({ onDrop });
 
+  // Export logic with support for either background-only or with data rows
   const handleExport = async () => {
     if (!canvas || (dataRows.length === 0 && !backgroundLoaded)) {
       setAlert({ open: true, message: "No data to export.", severity: "info" });
@@ -215,7 +264,7 @@ export default function CertificateEditor() {
     }
 
     if (dataRows.length === 0) {
-      // If only background image loaded but no data rows, export single certificate as PNG
+      // Only background image loaded, export single PNG
       const dataUrl = canvas.toDataURL({ format: "png" });
       const blob = await (await fetch(dataUrl)).blob();
       saveAs(blob, "certificate.png");
@@ -223,7 +272,7 @@ export default function CertificateEditor() {
       return;
     }
 
-    // Export multiple certificates when dataRows available
+    // Export multiple certificates if data rows present
     const zip = new JSZip();
 
     for (let i = 0; i < dataRows.length; i++) {
@@ -238,7 +287,7 @@ export default function CertificateEditor() {
 
       canvas.renderAll();
 
-      // Give time for rendering (optional)
+      // Small delay to allow render
       await new Promise((r) => setTimeout(r, 50));
 
       const dataUrl = canvas.toDataURL({ format: "png" });
@@ -251,6 +300,7 @@ export default function CertificateEditor() {
     setAlert({ open: true, message: "Certificates exported successfully.", severity: "success" });
   };
 
+  // Update selected textbox style on fontSize, fontFamily, alignment changes
   useEffect(() => {
     if (!canvas) return;
     const obj = canvas.getActiveObject();
@@ -287,7 +337,9 @@ export default function CertificateEditor() {
       </Box>
 
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, my: 2 }}>
-        <Tooltip title={!backgroundLoaded && dataRows.length === 0 ? "Upload background image or Excel file first" : "Add static text"}>
+        <Tooltip
+          title={!backgroundLoaded && dataRows.length === 0 ? "Upload background image or Excel file first" : "Add static text"}
+        >
           <span>
             <Button
               onClick={() => addTextbox("New Text")}
@@ -302,7 +354,10 @@ export default function CertificateEditor() {
         </Tooltip>
 
         {columns.map((col) => (
-          <Tooltip key={col} title={dataRows.length === 0 ? "Upload Excel file first" : `Add column: ${col}`}>
+          <Tooltip
+            key={col}
+            title={dataRows.length === 0 ? "Upload Excel file first" : `Add column: ${col}`}
+          >
             <span>
               <Button
                 onClick={() => addTextbox(`[${col}]`, true, col)}
