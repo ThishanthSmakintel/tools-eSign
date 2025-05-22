@@ -16,6 +16,8 @@ import {
   useTheme,
   TextField,
   Tooltip,
+  Alert,
+  Snackbar,
 } from "@mui/material";
 import { FolderZip, TextFields, CropFree } from "@mui/icons-material";
 
@@ -39,10 +41,14 @@ export default function CertificateEditor() {
   const [fontFamily, setFontFamily] = useState("Arial");
   const backgroundRef = useRef(null);
 
+  const [backgroundLoaded, setBackgroundLoaded] = useState(false); // NEW state
+
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
-  // Setup Fabric canvas and handle resizing
+  // Snackbar state for user feedback
+  const [alert, setAlert] = useState({ open: false, message: "", severity: "info" });
+
   useEffect(() => {
     if (!canvasRef.current || !containerRef.current) return;
 
@@ -54,7 +60,6 @@ export default function CertificateEditor() {
 
     setCanvas(fabricCanvas);
 
-    // Resize canvas function to keep 1000x600 aspect ratio
     const resizeCanvas = () => {
       if (!containerRef.current) return;
 
@@ -86,39 +91,30 @@ export default function CertificateEditor() {
     };
   }, []);
 
-  // Delete control icon rendering
   const renderDeleteIcon = (ctx, left, top) => {
     ctx.save();
-  
     const radius = 10;
-  
-    // Draw circular red button
     ctx.beginPath();
     ctx.arc(left, top, radius, 0, 2 * Math.PI, false);
-    ctx.fillStyle = "#f44336"; // MUI red
+    ctx.fillStyle = "#f44336";
     ctx.fill();
-  
-    // Draw white "X"
     ctx.strokeStyle = "#fff";
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
-  
     ctx.beginPath();
     ctx.moveTo(left - 4, top - 4);
     ctx.lineTo(left + 4, top + 4);
     ctx.moveTo(left + 4, top - 4);
     ctx.lineTo(left - 4, top + 4);
     ctx.stroke();
-  
     ctx.restore();
   };
-  
 
   const deleteObject = (_eventData, transform) => {
     const target = transform.target;
-    const canvas = target.canvas;
-    canvas.remove(target);
-    canvas.requestRenderAll();
+    const canvasInstance = target.canvas;
+    canvasInstance.remove(target);
+    canvasInstance.requestRenderAll();
   };
 
   const addDeleteControlToObject = (obj) => {
@@ -134,8 +130,16 @@ export default function CertificateEditor() {
     });
   };
 
-  // Add a textbox — static or dynamic based on Excel column
+  // Add textbox with validation to prevent adding if no background or dataRows loaded
   const addTextbox = (text, isDynamic = false, columnKey = null) => {
+    if (dataRows.length === 0 && !backgroundLoaded) {
+      setAlert({
+        open: true,
+        message: "Please upload a background image or an Excel file before adding textboxes.",
+        severity: "warning",
+      });
+      return;
+    }
     if (!canvas) return;
 
     const textbox = new fabric.Textbox(text, {
@@ -157,7 +161,6 @@ export default function CertificateEditor() {
     canvas.requestRenderAll();
   };
 
-  // File drop handler
   const onDrop = (acceptedFiles) => {
     const file = acceptedFiles[0];
     if (!file || !canvas) return;
@@ -167,12 +170,12 @@ export default function CertificateEditor() {
     if (file.type.includes("image")) {
       reader.onload = (f) => {
         fabric.Image.fromURL(f.target.result, (img) => {
-          // Scale image to fit canvas dimensions
           const scaleX = canvas.width / img.width;
           const scaleY = canvas.height / img.height;
           img.set({ scaleX, scaleY, selectable: false, evented: false });
           canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
           backgroundRef.current = img;
+          setBackgroundLoaded(true); // Set backgroundLoaded true here
         });
       };
       reader.readAsDataURL(file);
@@ -186,16 +189,17 @@ export default function CertificateEditor() {
           if (jsonData.length === 0) {
             setColumns([]);
             setDataRows([]);
-            alert("Excel sheet is empty.");
+            setAlert({ open: true, message: "Excel sheet is empty.", severity: "warning" });
             return;
           }
 
           setColumns(Object.keys(jsonData[0]));
           setDataRows(jsonData);
+          setAlert({ open: true, message: "Excel file loaded successfully.", severity: "success" });
         } catch (error) {
-          alert("Failed to read Excel file.");
           setColumns([]);
           setDataRows([]);
+          setAlert({ open: true, message: "Failed to read Excel file.", severity: "error" });
         }
       };
       reader.readAsBinaryString(file);
@@ -204,13 +208,22 @@ export default function CertificateEditor() {
 
   const { getRootProps, getInputProps } = useDropzone({ onDrop });
 
-  // Export all certificates as a ZIP of PNGs
   const handleExport = async () => {
-    if (!canvas || dataRows.length === 0) {
-      alert("No data to export.");
+    if (!canvas || (dataRows.length === 0 && !backgroundLoaded)) {
+      setAlert({ open: true, message: "No data to export.", severity: "info" });
       return;
     }
 
+    if (dataRows.length === 0) {
+      // If only background image loaded but no data rows, export single certificate as PNG
+      const dataUrl = canvas.toDataURL({ format: "png" });
+      const blob = await (await fetch(dataUrl)).blob();
+      saveAs(blob, "certificate.png");
+      setAlert({ open: true, message: "Certificate exported successfully.", severity: "success" });
+      return;
+    }
+
+    // Export multiple certificates when dataRows available
     const zip = new JSZip();
 
     for (let i = 0; i < dataRows.length; i++) {
@@ -225,6 +238,7 @@ export default function CertificateEditor() {
 
       canvas.renderAll();
 
+      // Give time for rendering (optional)
       await new Promise((r) => setTimeout(r, 50));
 
       const dataUrl = canvas.toDataURL({ format: "png" });
@@ -234,9 +248,9 @@ export default function CertificateEditor() {
 
     const content = await zip.generateAsync({ type: "blob" });
     saveAs(content, "certificates.zip");
+    setAlert({ open: true, message: "Certificates exported successfully.", severity: "success" });
   };
 
-  // Update selected textbox style on font/alignment change
   useEffect(() => {
     if (!canvas) return;
     const obj = canvas.getActiveObject();
@@ -249,7 +263,7 @@ export default function CertificateEditor() {
   return (
     <Box sx={{ p: 3, maxWidth: 1200, mx: "auto" }}>
       <Typography variant="h4" fontWeight={600} gutterBottom>
-      Certificate Editor
+        Certificate Editor
       </Typography>
 
       <Box
@@ -273,27 +287,34 @@ export default function CertificateEditor() {
       </Box>
 
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, my: 2 }}>
-        <Tooltip title="Add static text">
-          <Button
-            onClick={() => addTextbox("New Text")}
-            variant="outlined"
-            startIcon={<TextFields />}
-            fullWidth={isMobile}
-          >
-            Add Textbox
-          </Button>
+        <Tooltip title={!backgroundLoaded && dataRows.length === 0 ? "Upload background image or Excel file first" : "Add static text"}>
+          <span>
+            <Button
+              onClick={() => addTextbox("New Text")}
+              variant="outlined"
+              startIcon={<TextFields />}
+              fullWidth={isMobile}
+              disabled={!backgroundLoaded && dataRows.length === 0}
+            >
+              Add Textbox
+            </Button>
+          </span>
         </Tooltip>
 
         {columns.map((col) => (
-          <Button
-            key={col}
-            onClick={() => addTextbox(`[${col}]`, true, col)}
-            variant="outlined"
-            startIcon={<CropFree />}
-            fullWidth={isMobile}
-          >
-            Add {col}
-          </Button>
+          <Tooltip key={col} title={dataRows.length === 0 ? "Upload Excel file first" : `Add column: ${col}`}>
+            <span>
+              <Button
+                onClick={() => addTextbox(`[${col}]`, true, col)}
+                variant="outlined"
+                startIcon={<CropFree />}
+                fullWidth={isMobile}
+                disabled={dataRows.length === 0}
+              >
+                Add {col}
+              </Button>
+            </span>
+          </Tooltip>
         ))}
       </Box>
 
@@ -351,7 +372,7 @@ export default function CertificateEditor() {
           variant="contained"
           startIcon={<FolderZip />}
           onClick={handleExport}
-          disabled={dataRows.length === 0}
+          disabled={!backgroundLoaded && dataRows.length === 0}
           fullWidth={isMobile}
           sx={{ minWidth: 160 }}
         >
@@ -359,7 +380,6 @@ export default function CertificateEditor() {
         </Button>
       </Box>
 
-      {/* Container with fixed aspect ratio holding the canvas */}
       <Box
         ref={containerRef}
         sx={{
@@ -380,6 +400,21 @@ export default function CertificateEditor() {
           style={{ display: "block", width: "100%", height: "100%" }}
         />
       </Box>
+
+      <Snackbar
+        open={alert.open}
+        autoHideDuration={4000}
+        onClose={() => setAlert((a) => ({ ...a, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setAlert((a) => ({ ...a, open: false }))}
+          severity={alert.severity}
+          sx={{ width: "100%" }}
+        >
+          {alert.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
