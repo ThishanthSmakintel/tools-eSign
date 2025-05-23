@@ -21,23 +21,17 @@ import {
   Paper,
   Grid,
   Stack,
-  Divider,
-  IconButton,
-  Slider,
   ToggleButtonGroup,
   ToggleButton,
   Card,
   CardContent,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
+  CircularProgress,
+  List,
+  ListItem,
+  ListItemText,
+  IconButton,
+  Divider,
+  ButtonGroup,
 } from "@mui/material";
 import {
   FolderZip,
@@ -54,9 +48,11 @@ import {
   FormatItalic,
   FormatUnderlined,
   FormatColorText,
-  Image,
-  InsertDriveFile,
   Preview,
+  RestartAlt,
+  ChevronLeft,
+  ChevronRight,
+  InsertDriveFile,
 } from "@mui/icons-material";
 
 const FONT_FAMILIES = [
@@ -87,13 +83,29 @@ export default function CertificateEditor() {
   const [textDecoration, setTextDecoration] = useState("");
   const [textColor, setTextColor] = useState("#000000");
   const [backgroundLoaded, setBackgroundLoaded] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
+  const [showPreview, setShowPreview] = useState(false);
+  const [exportType, setExportType] = useState("single");
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
-  const [alert, setAlert] = useState({ open: false, message: "", severity: "info" });
+  const [alert, setAlert] = useState({
+    open: false,
+    message: "",
+    severity: "info",
+  });
+
+  // Toggle font weight (bold)
+  const toggleBold = () => {
+    setFontWeight(fontWeight === "bold" ? "normal" : "bold");
+  };
+
+  // Toggle font style (italic)
+  const toggleItalic = () => {
+    setFontStyle(fontStyle === "italic" ? "normal" : "italic");
+  };
 
   // Initialize Fabric canvas
   useEffect(() => {
@@ -101,7 +113,7 @@ export default function CertificateEditor() {
 
     const fabricCanvas = new fabric.Canvas(canvasRef.current, {
       preserveObjectStacking: true,
-      backgroundColor: "#fff",
+      backgroundColor: "transparent",
       selection: true,
     });
 
@@ -144,9 +156,10 @@ export default function CertificateEditor() {
     const imgRatio = img.width / img.height;
     const canvasRatio = canvasWidth / canvasHeight;
 
-    let scaleFactor = imgRatio > canvasRatio 
-      ? canvasWidth / img.width 
-      : canvasHeight / img.height;
+    let scaleFactor =
+      imgRatio > canvasRatio
+        ? canvasWidth / img.width
+        : canvasHeight / img.height;
 
     img.scale(scaleFactor);
     img.left = (canvasWidth - img.getScaledWidth()) / 2;
@@ -201,16 +214,13 @@ export default function CertificateEditor() {
       fontWeight: fontOptions.fontWeight,
       fontStyle: fontOptions.fontStyle,
     });
-    
-    // Calculate width based on font size (1.2 multiplier for padding)
+
     const width = tempText.width * 1.2;
-    
-    // Calculate height based on line height (1.5x font size is standard)
     const height = tempText.fontSize * 1.5;
-    
+
     return {
-      width: Math.max(width, 100), // Minimum 100px width
-      height: Math.max(height, 30) // Minimum 30px height
+      width: Math.max(width, 100),
+      height: Math.max(height, 30),
     };
   };
 
@@ -218,7 +228,8 @@ export default function CertificateEditor() {
     if (dataRows.length === 0 && !backgroundLoaded) {
       setAlert({
         open: true,
-        message: "Please upload a background image or an Excel file before adding textboxes.",
+        message:
+          "Please upload a background image or an Excel file before adding textboxes.",
         severity: "warning",
       });
       return;
@@ -232,19 +243,15 @@ export default function CertificateEditor() {
       fontStyle,
     };
 
-    // Calculate dimensions for the initial text
     let { width, height } = calculateTextDimensions(text, fontOptions);
 
-    // For dynamic fields, calculate maximum dimensions across all possible values
     if (isDynamic && columnKey && dataRows.length > 0) {
-      dataRows.forEach(row => {
+      dataRows.forEach((row) => {
         const value = String(row[columnKey] || "");
         const dims = calculateTextDimensions(value, fontOptions);
         width = Math.max(width, dims.width);
       });
-      
-      // For dynamic fields, we keep the original height but lock width
-      height = fontSize * 1.5; // Standard line height
+      height = fontSize * 1.5;
     }
 
     const canvasWidth = canvas.getWidth();
@@ -266,25 +273,25 @@ export default function CertificateEditor() {
       columnKey: isDynamic ? columnKey : undefined,
       editable: true,
       cursorWidth: 2,
-      lockScalingX: isDynamic, // Only lock width for dynamic fields
-      lockScalingY: false, // Allow height adjustment for all fields
+      lockScalingX: isDynamic,
+      lockScalingY: isDynamic,
       lockUniScaling: true,
       lockMovementY: false,
       lockRotation: true,
       splitByGrapheme: true,
-      originX: 'center',
-      originY: 'center',
+      originX: "center",
+      originY: "center",
     });
 
     addDeleteControlToObject(textbox);
 
     if (isDynamic) {
       textbox.setControlsVisibility({
-        mt: true,  // Allow top resize
-        mb: true,  // Allow bottom resize
-        ml: false, // Disable left resize
-        mr: false, // Disable right resize
-        mtr: true, // Allow rotation
+        mt: false,
+        mb: false,
+        ml: false,
+        mr: false,
+        mtr: true,
       });
 
       textbox.controls.info = new fabric.Control({
@@ -302,17 +309,17 @@ export default function CertificateEditor() {
           ctx.fill();
           ctx.strokeStyle = "#fff";
           ctx.lineWidth = 2;
-          ctx.font = 'bold 12px Arial';
-          ctx.fillStyle = '#fff';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('i', left, top);
+          ctx.font = "bold 12px Arial";
+          ctx.fillStyle = "#fff";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("i", left, top);
           ctx.restore();
         },
         mouseDownHandler: () => {
           setAlert({
             open: true,
-            message: `This field's width is locked to fit all data from "${columnKey}" but height can be adjusted`,
+            message: `This dynamic field's dimensions are locked to fit all data from "${columnKey}"`,
             severity: "info",
           });
           return false;
@@ -340,7 +347,11 @@ export default function CertificateEditor() {
             centerBackgroundImage(canvas);
           });
           setBackgroundLoaded(true);
-          setAlert({ open: true, message: "Background image loaded successfully.", severity: "success" });
+          setAlert({
+            open: true,
+            message: "Background image loaded successfully.",
+            severity: "success",
+          });
         });
       };
       reader.readAsDataURL(file);
@@ -354,17 +365,29 @@ export default function CertificateEditor() {
           if (jsonData.length === 0) {
             setColumns([]);
             setDataRows([]);
-            setAlert({ open: true, message: "Excel sheet is empty.", severity: "warning" });
+            setAlert({
+              open: true,
+              message: "Excel sheet is empty.",
+              severity: "warning",
+            });
             return;
           }
 
           setColumns(Object.keys(jsonData[0]));
           setDataRows(jsonData);
-          setAlert({ open: true, message: "Excel file loaded successfully.", severity: "success" });
+          setAlert({
+            open: true,
+            message: "Excel file loaded successfully.",
+            severity: "success",
+          });
         } catch (error) {
           setColumns([]);
           setDataRows([]);
-          setAlert({ open: true, message: "Failed to read Excel file.", severity: "error" });
+          setAlert({
+            open: true,
+            message: "Failed to read Excel file.",
+            severity: "error",
+          });
         }
       };
       reader.readAsBinaryString(file);
@@ -373,21 +396,46 @@ export default function CertificateEditor() {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
 
-  const handlePreview = (index) => {
+  const updatePreview = (index) => {
     if (!canvas || dataRows.length === 0) return;
-    
+
     const row = dataRows[index];
-    
     canvas.getObjects("textbox").forEach((obj) => {
       const key = obj.columnKey;
       if (key && row[key] !== undefined) {
         obj.set("text", String(row[key]));
       }
     });
-
     canvas.renderAll();
-    setPreviewIndex(index);
-    setPreviewOpen(true);
+  };
+
+  const handleNextPreview = () => {
+    const nextIndex = (previewIndex + 1) % dataRows.length;
+    setPreviewIndex(nextIndex);
+    updatePreview(nextIndex);
+  };
+
+  const handlePrevPreview = () => {
+    const prevIndex = (previewIndex - 1 + dataRows.length) % dataRows.length;
+    setPreviewIndex(prevIndex);
+    updatePreview(prevIndex);
+  };
+
+  const togglePreview = () => {
+    if (showPreview) {
+      // When turning off preview, restore original text
+      canvas.getObjects("textbox").forEach((obj) => {
+        if (obj.columnKey) {
+          obj.set("text", `[${obj.columnKey}]`);
+        }
+      });
+      canvas.renderAll();
+    } else {
+      // When turning on preview, show first record
+      updatePreview(0);
+      setPreviewIndex(0);
+    }
+    setShowPreview(!showPreview);
   };
 
   const handleExport = async () => {
@@ -396,73 +444,151 @@ export default function CertificateEditor() {
       return;
     }
 
-    if (dataRows.length === 0) {
-      const dataUrl = canvas.toDataURL({ format: "png", multiplier: 2 });
-      const blob = dataURLtoBlob(dataUrl);
-      saveAs(blob, "certificate.png");
-      setAlert({ open: true, message: "Certificate exported successfully.", severity: "success" });
-      return;
-    }
+    setIsExporting(true);
 
-    const zip = new JSZip();
-    const promises = [];
+    try {
+      if (exportType === "single" || dataRows.length === 0) {
+        // Export single certificate (current preview or template)
+        const indexToExport = showPreview ? previewIndex : 0;
+        const row = dataRows[indexToExport] || {};
 
-    for (let i = 0; i < dataRows.length; i++) {
-      const row = dataRows[i];
-      
-      // Create a clone of the canvas to avoid flickering
-      const canvasClone = new fabric.StaticCanvas(null, {
-        width: canvas.width,
-        height: canvas.height,
-      });
-
-      // Copy background
-      if (canvas.backgroundImage) {
-        const bgImg = await new Promise(resolve => {
-          fabric.Image.fromURL(canvas.backgroundImage.toDataURL(), resolve);
+        const canvasClone = new fabric.StaticCanvas(null, {
+          width: canvas.width,
+          height: canvas.height,
         });
-        canvasClone.setBackgroundImage(bgImg, () => {
-          centerBackgroundImage(canvasClone);
+
+        if (canvas.backgroundImage) {
+          const bgImg = await new Promise((resolve) => {
+            fabric.Image.fromURL(canvas.backgroundImage.toDataURL(), resolve);
+          });
+          canvasClone.setBackgroundImage(bgImg, () => {
+            centerBackgroundImage(canvasClone);
+          });
+        }
+
+        canvas.getObjects().forEach((obj) => {
+          const clone = fabric.util.object.clone(obj);
+          const key = clone.columnKey;
+          if (key && row[key] !== undefined) {
+            clone.set("text", String(row[key]));
+          }
+          canvasClone.add(clone);
+        });
+
+        canvasClone.renderAll();
+
+        const dataUrl = canvasClone.toDataURL({
+          format: "png",
+          multiplier: 2,
+        });
+
+        const blob = dataURLtoBlob(dataUrl);
+        const fileName = row.id
+          ? `certificate_${row.id}.png`
+          : "certificate.png";
+
+        saveAs(blob, fileName);
+        setAlert({
+          open: true,
+          message: "Certificate exported successfully.",
+          severity: "success",
+        });
+        canvasClone.dispose();
+      } else {
+        // Bulk export as ZIP
+        const zip = new JSZip();
+        const promises = [];
+
+        for (let i = 0; i < dataRows.length; i++) {
+          const row = dataRows[i];
+          const canvasClone = new fabric.StaticCanvas(null, {
+            width: canvas.width,
+            height: canvas.height,
+          });
+
+          if (canvas.backgroundImage) {
+            const bgImg = await new Promise((resolve) => {
+              fabric.Image.fromURL(canvas.backgroundImage.toDataURL(), resolve);
+            });
+            canvasClone.setBackgroundImage(bgImg, () => {
+              centerBackgroundImage(canvasClone);
+            });
+          }
+
+          canvas.getObjects().forEach((obj) => {
+            const clone = fabric.util.object.clone(obj);
+            const key = clone.columnKey;
+            if (key && row[key] !== undefined) {
+              clone.set("text", String(row[key]));
+            }
+            canvasClone.add(clone);
+          });
+
+          canvasClone.renderAll();
+
+          promises.push(
+            new Promise((resolve) => {
+              setTimeout(() => {
+                const dataUrl = canvasClone.toDataURL({
+                  format: "png",
+                  multiplier: 2,
+                });
+                resolve({ dataUrl, index: i, row });
+                canvasClone.dispose();
+              }, 100);
+            })
+          );
+        }
+
+        const results = await Promise.all(promises);
+        results.forEach(({ dataUrl, index, row }) => {
+          const blob = dataURLtoBlob(dataUrl);
+          const fileName = row.id
+            ? `certificate_${row.id}.png`
+            : `certificate_${index + 1}.png`;
+          zip.file(fileName, blob);
+        });
+
+        const content = await zip.generateAsync({ type: "blob" });
+        saveAs(content, "certificates.zip");
+        setAlert({
+          open: true,
+          message: `${dataRows.length} certificates exported successfully.`,
+          severity: "success",
         });
       }
-
-      // Copy objects with current data
-      canvas.getObjects().forEach(obj => {
-        const clone = fabric.util.object.clone(obj);
-        const key = clone.columnKey;
-        if (key && row[key] !== undefined) {
-          clone.set("text", String(row[key]));
-        }
-        canvasClone.add(clone);
+    } catch (error) {
+      setAlert({
+        open: true,
+        message: "Error during export: " + error.message,
+        severity: "error",
       });
-
-      canvasClone.renderAll();
-
-      promises.push(new Promise((resolve) => {
-        setTimeout(() => {
-          const dataUrl = canvasClone.toDataURL({ 
-            format: "png",
-            multiplier: 2 // Higher quality
-          });
-          resolve({ dataUrl, index: i });
-          canvasClone.dispose();
-        }, 100);
-      }));
+    } finally {
+      setIsExporting(false);
+      if (showPreview) {
+        updatePreview(previewIndex);
+      }
     }
+  };
 
-    const results = await Promise.all(promises);
-    results.forEach(({ dataUrl, index }) => {
-      const blob = dataURLtoBlob(dataUrl);
-      zip.file(`certificate_${index + 1}.png`, blob);
-    });
-
-    const content = await zip.generateAsync({ type: "blob" });
-    saveAs(content, "certificates.zip");
-    setAlert({ open: true, message: `${dataRows.length} certificates exported successfully.`, severity: "success" });
+  const handleReset = () => {
+    if (canvas) {
+      canvas.clear();
+      setColumns([]);
+      setDataRows([]);
+      setBackgroundLoaded(false);
+      setPreviewIndex(0);
+      setShowPreview(false);
+      setAlert({
+        open: true,
+        message: "Editor has been reset.",
+        severity: "info",
+      });
+    }
   };
 
   const dataURLtoBlob = (dataUrl) => {
-    const arr = dataUrl.split(',');
+    const arr = dataUrl.split(",");
     const mime = arr[0].match(/:(.*?);/)[1];
     const bstr = atob(arr[1]);
     let n = bstr.length;
@@ -473,7 +599,6 @@ export default function CertificateEditor() {
     return new Blob([u8arr], { type: mime });
   };
 
-  // Update selected textbox style when text properties change
   useEffect(() => {
     if (!canvas) return;
     const obj = canvas.getActiveObject();
@@ -488,8 +613,7 @@ export default function CertificateEditor() {
         fill: textColor,
         textAlign: alignment,
       });
-      
-      // For dynamic fields, only update font properties, not dimensions
+
       if (!obj.columnKey) {
         const { width } = calculateTextDimensions(obj.text, {
           fontSize,
@@ -497,14 +621,22 @@ export default function CertificateEditor() {
           fontWeight,
           fontStyle,
         });
-        obj.set('width', width);
+        obj.set("width", width);
       }
-      
+
       canvas.requestRenderAll();
     }
-  }, [fontSize, fontFamily, fontWeight, fontStyle, textDecoration, textColor, alignment, canvas]);
+  }, [
+    fontSize,
+    fontFamily,
+    fontWeight,
+    fontStyle,
+    textDecoration,
+    textColor,
+    alignment,
+    canvas,
+  ]);
 
-  // Handle canvas object selection changes
   useEffect(() => {
     if (!canvas) return;
 
@@ -519,7 +651,9 @@ export default function CertificateEditor() {
           [
             activeObject.underline ? "underline" : "",
             activeObject.linethrough ? "line-through" : "",
-          ].filter(Boolean).join(" ")
+          ]
+            .filter(Boolean)
+            .join(" ")
         );
         setTextColor(activeObject.fill);
         setAlignment(activeObject.textAlign);
@@ -547,13 +681,11 @@ export default function CertificateEditor() {
 
   return (
     <Box sx={{ p: isMobile ? 1 : 3, maxWidth: 1200, mx: "auto" }}>
-      <Typography variant="h4" fontWeight={600} gutterBottom>
-        Certificate Editor
-      </Typography>
+      <Typography variant="h4" fontWeight={600} gutterBottom></Typography>
 
       <Card variant="outlined" sx={{ mb: 3 }}>
         <CardContent>
-          <Grid container spacing={3}>
+          <Grid>
             <Grid item xs={12} md={6}>
               <Paper
                 {...getRootProps()}
@@ -582,11 +714,7 @@ export default function CertificateEditor() {
                 <Typography variant="body2" color="text.secondary">
                   Upload a background image or Excel file with data
                 </Typography>
-                <Button
-                  variant="contained"
-                  startIcon={<Add />}
-                  sx={{ mt: 2 }}
-                >
+                <Button variant="contained" startIcon={<Add />} sx={{ mt: 2 }}>
                   Browse Files
                 </Button>
               </Paper>
@@ -600,7 +728,11 @@ export default function CertificateEditor() {
                   </Typography>
                   <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                     <Tooltip
-                      title={!backgroundLoaded && dataRows.length === 0 ? "Upload background image or Excel file first" : "Add static text"}
+                      title={
+                        !backgroundLoaded && dataRows.length === 0
+                          ? "Upload background image or Excel file first"
+                          : "Add static text"
+                      }
                     >
                       <span>
                         <Button
@@ -618,7 +750,11 @@ export default function CertificateEditor() {
                     {columns.map((col) => (
                       <Tooltip
                         key={col}
-                        title={dataRows.length === 0 ? "Upload Excel file first" : `Add column: ${col}`}
+                        title={
+                          dataRows.length === 0
+                            ? "Upload Excel file first"
+                            : `Add column: ${col}`
+                        }
                       >
                         <span>
                           <Button
@@ -650,7 +786,11 @@ export default function CertificateEditor() {
                           onChange={(e) => setFontFamily(e.target.value)}
                         >
                           {FONT_FAMILIES.map((font) => (
-                            <MenuItem key={font} value={font} style={{ fontFamily: font }}>
+                            <MenuItem
+                              key={font}
+                              value={font}
+                              style={{ fontFamily: font }}
+                            >
                               {font}
                             </MenuItem>
                           ))}
@@ -658,44 +798,39 @@ export default function CertificateEditor() {
                       </FormControl>
                     </Grid>
                     <Grid item xs={12} sm={6}>
-                      <Stack spacing={1}>
-                        <Typography variant="caption">Font Size</Typography>
-                        <Slider
-                          value={fontSize}
-                          onChange={(e, val) => setFontSize(val)}
-                          min={8}
-                          max={72}
-                          valueLabelDisplay="auto"
-                        />
-                      </Stack>
+                      <TextField
+                        label="Font Size"
+                        type="number"
+                        value={fontSize}
+                        onChange={(e) =>
+                          setFontSize(
+                            Math.max(
+                              8,
+                              Math.min(72, parseInt(e.target.value) || 24)
+                            )
+                          )
+                        }
+                        fullWidth
+                        size="small"
+                        inputProps={{ min: 8, max: 72 }}
+                      />
                     </Grid>
                     <Grid item xs={12}>
                       <Stack direction="row" spacing={1}>
-                        <ToggleButtonGroup
-                          value={fontWeight}
-                          exclusive
-                          onChange={(e, val) => val && setFontWeight(val)}
-                          size="small"
-                        >
-                          <ToggleButton value="normal">
+                        <ToggleButtonGroup size="small">
+                          <ToggleButton
+                            value="bold"
+                            selected={fontWeight === "bold"}
+                            onClick={toggleBold}
+                          >
                             <FormatBold />
                           </ToggleButton>
-                          <ToggleButton value="bold">
-                            <FormatBold sx={{ fontWeight: 'bold' }} />
-                          </ToggleButton>
-                        </ToggleButtonGroup>
-
-                        <ToggleButtonGroup
-                          value={fontStyle}
-                          exclusive
-                          onChange={(e, val) => val && setFontStyle(val)}
-                          size="small"
-                        >
-                          <ToggleButton value="normal">
+                          <ToggleButton
+                            value="italic"
+                            selected={fontStyle === "italic"}
+                            onClick={toggleItalic}
+                          >
                             <FormatItalic />
-                          </ToggleButton>
-                          <ToggleButton value="italic">
-                            <FormatItalic sx={{ fontStyle: 'italic' }} />
                           </ToggleButton>
                         </ToggleButtonGroup>
 
@@ -718,7 +853,9 @@ export default function CertificateEditor() {
                           sx={{ width: 60 }}
                           InputProps={{
                             startAdornment: (
-                              <FormatColorText sx={{ color: textColor, mr: 1 }} />
+                              <FormatColorText
+                                sx={{ color: textColor, mr: 1 }}
+                              />
                             ),
                           }}
                         />
@@ -753,28 +890,89 @@ export default function CertificateEditor() {
                   <Button
                     variant="outlined"
                     startIcon={<Preview />}
-                    onClick={() => handlePreview(0)}
+                    onClick={togglePreview}
                     disabled={dataRows.length === 0}
                     fullWidth
                   >
-                    Preview
+                    {showPreview ? "Exit Preview" : "Preview"}
                   </Button>
-                  <Button
-                    variant="contained"
-                    startIcon={<FolderZip />}
-                    onClick={handleExport}
-                    disabled={!backgroundLoaded && dataRows.length === 0}
-                    fullWidth
-                    size="large"
-                  >
-                    Export
-                  </Button>
+
+                  <ButtonGroup fullWidth>
+                    <Button
+                      variant={
+                        exportType === "single" ? "contained" : "outlined"
+                      }
+                      onClick={() => setExportType("single")}
+                      startIcon={<InsertDriveFile />}
+                    >
+                      Single
+                    </Button>
+                    <Button
+                      variant={exportType === "bulk" ? "contained" : "outlined"}
+                      onClick={() => setExportType("bulk")}
+                      startIcon={<FolderZip />}
+                      disabled={dataRows.length === 0}
+                    >
+                      Bulk
+                    </Button>
+                  </ButtonGroup>
                 </Stack>
+
+                <Button
+                  variant="contained"
+                  onClick={handleExport}
+                  disabled={!backgroundLoaded}
+                  fullWidth
+                  size="large"
+                >
+                  {isExporting ? (
+                    <CircularProgress size={24} color="inherit" />
+                  ) : (
+                    `Export ${exportType === "single" ? "Current" : "All"}`
+                  )}
+                </Button>
+
+                <Button
+                  variant="outlined"
+                  color="error"
+                  startIcon={<RestartAlt />}
+                  onClick={handleReset}
+                  fullWidth
+                >
+                  Reset Editor
+                </Button>
               </Stack>
             </Grid>
           </Grid>
         </CardContent>
       </Card>
+
+      {showPreview && dataRows.length > 0 && (
+        <Paper sx={{ mt: 3, p: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center" }}>
+            <Typography variant="h6" sx={{ flexGrow: 1 }}>
+              Data Preview ({previewIndex + 1} of {dataRows.length})
+            </Typography>
+            <IconButton onClick={handlePrevPreview}>
+              <ChevronLeft />
+            </IconButton>
+            <IconButton onClick={handleNextPreview}>
+              <ChevronRight />
+            </IconButton>
+          </Box>
+          <Divider sx={{ mb: 2 }} />
+          <List dense>
+            {columns.map((col) => (
+              <ListItem key={col}>
+                <ListItemText
+                  primary={col}
+                  secondary={dataRows[previewIndex]?.[col] || "N/A"}
+                />
+              </ListItem>
+            ))}
+          </List>
+        </Paper>
+      )}
 
       <Box
         ref={containerRef}
@@ -786,6 +984,7 @@ export default function CertificateEditor() {
           borderRadius: 2,
           backgroundColor: "background.paper",
           p: 1,
+          m: 2,
           aspectRatio: "1000 / 600",
           overflow: "hidden",
           mx: "auto",
@@ -798,82 +997,6 @@ export default function CertificateEditor() {
           style={{ display: "block", width: "100%", height: "100%" }}
         />
       </Box>
-
-      <Dialog
-        open={previewOpen}
-        onClose={() => setPreviewOpen(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>Certificate Preview</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={8}>
-              <Box
-                sx={{
-                  border: "1px solid",
-                  borderColor: "divider",
-                  borderRadius: 2,
-                  backgroundColor: "background.paper",
-                  p: 1,
-                  aspectRatio: "1000 / 600",
-                  overflow: "hidden",
-                }}
-              >
-                <canvas
-                  id="previewCanvas"
-                  ref={canvasRef}
-                  style={{ display: "block", width: "100%", height: "100%" }}
-                />
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TableContainer component={Paper}>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Column</TableCell>
-                      <TableCell>Value</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {columns.map((col) => (
-                      <TableRow key={col}>
-                        <TableCell>{col}</TableCell>
-                        <TableCell>
-                          {dataRows[previewIndex]?.[col] || ''}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-              <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between' }}>
-                <Button
-                  variant="outlined"
-                  onClick={() => handlePreview(Math.max(0, previewIndex - 1))}
-                  disabled={previewIndex === 0}
-                >
-                  Previous
-                </Button>
-                <Typography variant="body2" sx={{ alignSelf: 'center' }}>
-                  {previewIndex + 1} of {dataRows.length}
-                </Typography>
-                <Button
-                  variant="outlined"
-                  onClick={() => handlePreview(Math.min(dataRows.length - 1, previewIndex + 1))}
-                  disabled={previewIndex === dataRows.length - 1}
-                >
-                  Next
-                </Button>
-              </Box>
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPreviewOpen(false)}>Close</Button>
-        </DialogActions>
-      </Dialog>
 
       <Snackbar
         open={alert.open}
